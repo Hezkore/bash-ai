@@ -1,6 +1,6 @@
-# Bash AI (bai)
+# Bash AI
 
-Bash AI (bai) is a bash shell script that acts as an AI assistant, allowing you to use natural language for any terminal-based task. It provides command suggestions based on your input and allows you to execute the suggested commands if desired.
+Bash AI _(bai)_ is a bash shell script that acts as an AI assistant, allowing you to use natural language for any terminal-based task. It provides command suggestions based on your input and allows you to execute or edit the suggested commands if desired.
 
 ## Features
 
@@ -8,6 +8,7 @@ Bash AI (bai) is a bash shell script that acts as an AI assistant, allowing you 
 - Command suggestions: Get intelligent command suggestions based on your input.
 - Command information: Provides details about the suggested command.
 - Execute commands: Choose to execute the suggested commands directly from bai.
+- Edit commands: Ability to edit the suggested commands before execution.
 
 ## Installation
 
