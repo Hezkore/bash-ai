@@ -1,14 +1,28 @@
 # Bash AI
 
-Bash AI _(bai)_ is a bash shell script that acts as an AI assistant, allowing you to use natural language for any terminal-based task. It provides command suggestions based on your input and allows you to execute or edit the suggested commands if desired.
+Bash AI _(bai)_ is a bash shell script that acts as an AI assistant, allowing you to ask questions and perform terminal-based tasks using natural language. It provides answers and command suggestions based on your input and allows you to execute or edit the suggested commands if desired.
 
 ## Features
 
-- Natural language interface: Communicate with the terminal using everyday language.
-- Command suggestions: Get intelligent command suggestions based on your input.
-- Command information: Provides details about the suggested command.
-- Execute commands: Choose to execute the suggested commands directly from bai.
-- Edit commands: Ability to edit the suggested commands before execution.
+Bash AI offers the following features:
+
+- **Natural Language Interface**\
+	Communicate with the terminal using everyday language.
+	
+- **Question Answering**\
+	Get answers to all your terminal questions by ending your request with a question mark.
+
+- **Command Suggestions**\
+	Receive intelligent command suggestions based on your input.
+
+- **Command Information**\
+	Get detailed information about the suggested commands.
+
+- **Command Execution**\
+	Choose to execute the suggested commands directly from Bash AI.
+
+- **Command Editing**\
+	Edit the suggested commands before execution.
 
 ## Installation
 
@@ -44,11 +58,17 @@ You can also change the model, temperature and query in this file.
 
 ## Usage
 
-Run `./bai.sh your request` and Bash AI will return a suggestion for your request.\
+Run `./bai.sh your request` and Bash AI will return a command suggestion for your request.\
 For example:
 
 ```
 ./bai.sh create a new directory with a name of your choice, then create a text file inside it
+```
+
+You can also ask questions by ending your request with a question mark:
+
+```
+./bai.sh what is the current time?
 ```
 
 ## Prerequisites

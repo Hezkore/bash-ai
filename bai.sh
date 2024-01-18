@@ -4,13 +4,15 @@
 # Constants
 PRE_TEXT="  "
 NO_REPLY_TEXT="¯\_(ツ)_/¯"
-CMD_TEXT_COLOR="\e[48;5;236m\e[38;5;203m"
+CMD_BG_COLOR="\e[48;5;236m"
+CMD_TEXT_COLOR="\e[38;5;203m"
 INFO_TEXT_COLOR="\e[90;3m"
 CANCEL_TEXT_COLOR="\e[93m"
 OK_TEXT_COLOR="\e[92m"
 RESET_COLOR="\e[0m"
 CLEAR_LINE="\033[2K\r"
-DEFAULT_QUERY="Return a JSON object containing 'cmd' and 'info' fields. 'cmd' is the simplest POSIX Bash command for the query. 'info' provides details on what the command does."
+DEFAULT_EXEC_QUERY="Return a JSON object containing 'cmd' and 'info' fields. 'cmd' is the simplest POSIX Bash command for the query. 'info' provides details on what the command does."
+DEFAULT_QUESTION_QUERY="Provide a short single-line plain text answer to the following terminal-related query."
 
 # Configuration file path
 CONFIG_FILE=~/.config/bai.cfg
@@ -25,7 +27,8 @@ if [ ! -f "$CONFIG_FILE" ]; then
 		echo "model=gpt-3.5-turbo"
 		echo "temp=0.1"
 		echo "tokens=100"
-		echo "query="
+		echo "exec_query="
+		echo "question_query="
 	} >> "$CONFIG_FILE"
 fi
 
@@ -49,19 +52,90 @@ OPENAI_MODEL=$(echo "${config[@]}" | grep -oP '(?<=^model=).+')
 # Extract OpenAI temperature from configuration
 OPENAI_TEMP=$(echo "${config[@]}" | grep -oP '(?<=^temp=).+')
 
-# Extract OpenAI system query from configuration
-OPENAI_QUERY=$(echo "${config[@]}" | grep -oP '(?<=^query=).+')
+# Extract OpenAI system execution query from configuration
+OPENAI_EXEC_QUERY=$(echo "${config[@]}" | grep -oP '(?<=^exec_query=).+')
+
+# Extract OpenAI system question query from configuration
+OPENAI_QUESTION_QUERY=$(echo "${config[@]}" | grep -oP '(?<=^question_query=).+')
 
 # Extract maximum token count from configuration
 OPENAI_TOKENS=$(echo "${config[@]}" | grep -oP '(?<=^tokens=).+')
 
-# Apply default OpenAI system query if needed
-if [ -z "$OPENAI_QUERY" ]; then
-	OPENAI_QUERY="$DEFAULT_QUERY"
+# Apply default query if none is provided
+if [ -z "$OPENAI_EXEC_QUERY" ]; then
+	OPENAI_EXEC_QUERY="$DEFAULT_EXEC_QUERY"
+fi
+if [ -z "$OPENAI_QUESTION_QUERY" ]; then
+	OPENAI_QUESTION_QUERY="$DEFAULT_QUESTION_QUERY"
 fi
 
 # User AI query
 USER_QUERY=$*
+
+# Determine if we should use the question query or the execution query
+if [[ "$USER_QUERY" == *"?"* ]]; then
+	IS_QUESTION=true
+	
+	OPENAI_MESSAGES='{
+        "role": "system",
+        "content": "'"${OPENAI_QUESTION_QUERY}"'"
+    },
+    {
+        "role": "user",
+        "content": "how do I list all files?"
+    },
+    {
+        "role": "assistant",
+        "content": "use \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' ls -a \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' to list all files, including hidden ones, in the current directory"
+    },
+    {
+        "role": "user",
+        "content": "how do I recursively list all the files?"
+    },
+    {
+        "role": "assistant",
+        "content": "use \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' ls -aR \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' to list all files recursively, including hidden ones, in the current directory"
+    },
+    {
+        "role": "user",
+        "content": "how do I print hello world?"
+    },
+    {
+        "role": "assistant",
+        "content": "use \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' echo \\\"hello world\\\" \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' to print the text \\\"hello world\\\" to the terminal"
+    },'
+else
+	IS_QUESTION=false
+	
+	OPENAI_MESSAGES='{
+        "role": "system",
+        "content": "'"${OPENAI_EXEC_QUERY}"'"
+    },
+    {
+        "role": "user",
+        "content": "list all files"
+    },
+    {
+        "role": "assistant",
+        "content": "{ \"cmd\": \"ls -a\", \"info\": \"list all files, including hidden ones, in the current directory\" }"
+    },
+    {
+        "role": "user",
+        "content": "recursively list all the files"
+    },
+    {
+        "role": "assistant",
+        "content": "{ \"cmd\": \"ls -aR\", \"info\": \"list all files recursively, including hidden ones, in the current directory\" }"
+    },
+    {
+        "role": "user",
+        "content": "print hello world"
+    },
+    {
+        "role": "assistant",
+        "content": "{ \"cmd\": \"echo \\\"hello world\\\"\", \"info\": \"print the text \\\"hello world\\\" to the terminal\" }"
+    },'
+fi
 
 # Notify the user about our progress
 echo
@@ -73,40 +147,16 @@ RESPONSE=$(curl -s -X POST -H "Authorization:Bearer $OPENAI_KEY" -H "Content-Typ
 	"max_tokens": '"$OPENAI_TOKENS"',
 	"temperature": '"$OPENAI_TEMP"',
 	"messages": [
-		{
-			"role": "system",
-			"content": "'"${OPENAI_QUERY}"'"
-		},
-		{
-			"role": "user",
-			"content": "list all files"
-		},
-		{
-			"role": "assistant",
-			"content": "{ \"cmd\": \"ls -a\", \"info\": \"list all files, including hidden ones, in the current directory\" }"
-		},
-		{
-			"role": "user",
-			"content": "recursively list all the files"
-		},
-		{
-			"role": "assistant",
-			"content": "{ \"cmd\": \"ls -aR\", \"info\": \"list all files recursively, including hidden ones, in the current directory\" }"
-		},
-		{
-			"role": "user",
-			"content": "print hello world"
-		},
-		{
-			"role": "assistant",
-			"content": "{ \"cmd\": \"echo \\\"hello world\\\"\", \"info\": \"print the text \\\"hello world\\\" to the terminal\" }"
-		},
+		'"$OPENAI_MESSAGES"'
 		{
 			"role": "user",
 			"content": "'"${USER_QUERY}"'"
 		}
 	]
 }' "$OPENAI_URL")
+
+#echo $RESPONSE
+#exit 0
 
 # Extract the reply from the JSON response
 REPLY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed "s/'//g")
@@ -117,7 +167,10 @@ if [ -z "$REPLY" ]; then
 	# We didn't get a reply
 	echo "${PRE_TEXT}${NO_REPLY_TEXT}"
 	exit 1
-else
+fi
+
+# Determine if this is regarding a question or not
+if [ "$IS_QUESTION" = false ]; then
 	# Extract command from response
 	CMD=$(echo "$REPLY" | jq -r '.cmd')
 	if [ -z "$CMD" ]; then
@@ -134,7 +187,7 @@ else
 	fi
 	
 	# Print command and information
-	echo -e "${PRE_TEXT}${CMD_TEXT_COLOR} ${CMD} ${RESET_COLOR}"
+	echo -e "${PRE_TEXT}${CMD_BG_COLOR}${CMD_TEXT_COLOR} ${CMD} ${RESET_COLOR}"
 	echo
 	echo -e "${PRE_TEXT}${INFO_TEXT_COLOR}${INFO}${RESET_COLOR}"
 	echo
@@ -166,5 +219,9 @@ else
 	fi
 	echo
 	
+	exit 0
+else
+	# This is a question
+	echo -e "${PRE_TEXT}${INFO_TEXT_COLOR}${REPLY}${RESET_COLOR}"
 	exit 0
 fi
