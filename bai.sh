@@ -18,7 +18,7 @@ RESET_COLOR="\e[0m"
 CLEAR_LINE="\033[2K\r"
 DEFAULT_EXEC_QUERY="Return a JSON object containing 'cmd' and 'info' fields. 'cmd' is the simplest POSIX Bash command for the query. 'info' provides details on what the command does."
 DEFAULT_QUESTION_QUERY="Provide an answer to the following terminal-related query."
-GLOBAL_QUERY="Always provide single-line, step-by-step, instructions. User is always in the terminal. User is asking information related to $DISTRO_INFO and $USER_INFO."
+GLOBAL_QUERY="Always provide single-line, step-by-step instructions. User is always in the terminal. Query is related to $DISTRO_INFO and $USER_INFO."
 
 # Configuration file path
 CONFIG_FILE=~/.config/bai.cfg
@@ -108,7 +108,7 @@ if [[ "$USER_QUERY" == *"?"* ]]; then
     },
     {
         "role": "assistant",
-        "content": "Type \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' echo \\\"hello world\\\" \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' to print \\\"hello world\\\""
+        "content": "Type \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' echo \\\"hello world\\\" \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' and press \'${RESET_COLOR}'Enter\'${INFO_TEXT_COLOR}' to print \\\"hello world\\\""
     },
     {
         "role": "user",
