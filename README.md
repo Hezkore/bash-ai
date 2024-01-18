@@ -39,7 +39,7 @@ You must provide your OpenAI key in the `key=` field of this file. The OpenAI ke
 You can also change the model, temperature and query in this file.
 
 > [!TIP]
-> model `gpt-4` produces much better results than the standard `gpt-3.5-turbo` model.
+> The `gpt-4` models produce much better results than the standard `gpt-3.5-turbo` model.
 
 ## Usage
 
