@@ -17,6 +17,9 @@ Bash AI offers the following features:
 
 - **Command Information**\
 	Get detailed information about the suggested commands.
+	
+- **Distribution Awareness**\
+	Get answers and commands that are compatible with, and related to, your specific Linux distribution.
 
 - **Command Execution**\
 	Choose to execute the suggested commands directly from Bash AI.
