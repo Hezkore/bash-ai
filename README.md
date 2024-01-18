@@ -29,6 +29,8 @@ Bash AI offers the following features:
 
 ## Installation
 
+All you have to do is run the Bash AI script to get started.
+
 1. Clone the repository:
 
 	```bash
@@ -40,7 +42,7 @@ Bash AI offers the following features:
 	chmod +x bai.sh
 	```
 
-3. Execute bai:
+3. Execute Bash AI:
 
 	```bash
 	./bai.sh
@@ -61,7 +63,7 @@ You can also change the model, temperature and query in this file.
 
 ## Usage
 
-Run `./bai.sh your request` and Bash AI will return a command suggestion for your request.\
+Run `./bai.sh your request here` and Bash AI will return a command suggestion for your request.\
 For example:
 
 ```
@@ -79,6 +81,12 @@ You can also ask questions by ending your request with a question mark:
 - [OpenAI account and API key](https://platform.openai.com/apps)
 - [Curl](https://curl.se/download.html)
 - [JQ](https://stedolan.github.io/jq/download/)
+
+## Known Issues
+
+- Single quotes will cause your request to fail.\
+	For example, `./bai.sh what's the current time?` will fail, but both `./bai.sh whats the current time?` and `./bai.sh what is the current time?` will succeed.\
+	This is a limitation of the terminal.
 
 ## License
 
