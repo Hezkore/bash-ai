@@ -18,13 +18,15 @@ CONFIG_FILE=~/.config/bai.cfg
 # Check for configuration file existence
 if [ ! -f "$CONFIG_FILE" ]; then
 	# Initialize configuration file with default values
-	echo "key=" >> "$CONFIG_FILE"
-	echo "" >> "$CONFIG_FILE"
-	echo "api=https://api.openai.com/v1/chat/completions" >> "$CONFIG_FILE"
-	echo "model=gpt-3.5-turbo" >> "$CONFIG_FILE"
-	echo "temp=0.1" >> "$CONFIG_FILE"
-	echo "tokens=100" >> "$CONFIG_FILE"
-	echo "query=" >> "$CONFIG_FILE"
+	{
+		echo "key="
+		echo ""
+		echo "api=https://api.openai.com/v1/chat/completions"
+		echo "model=gpt-3.5-turbo"
+		echo "temp=0.1"
+		echo "tokens=100"
+		echo "query="
+	} >> "$CONFIG_FILE"
 fi
 
 # Extract OpenAI Key from configuration
@@ -59,7 +61,7 @@ if [ -z "$OPENAI_QUERY" ]; then
 fi
 
 # User AI query
-USER_QUERY=$@
+USER_QUERY=$*
 
 # Notify the user about our progress
 echo
@@ -67,8 +69,9 @@ echo -ne "${PRE_TEXT}Thinking...\r"
 
 # Send request to OpenAI API
 RESPONSE=$(curl -s -X POST -H "Authorization:Bearer $OPENAI_KEY" -H "Content-Type:application/json" -d '{
-	"model": "'$OPENAI_MODEL'",
-	"max_tokens": '$OPENAI_TOKENS',
+	"model": "'"$OPENAI_MODEL"'",
+	"max_tokens": '"$OPENAI_TOKENS"',
+	"temperature": '"$OPENAI_TEMP"',
 	"messages": [
 		{
 			"role": "system",
@@ -103,7 +106,7 @@ RESPONSE=$(curl -s -X POST -H "Authorization:Bearer $OPENAI_KEY" -H "Content-Typ
 			"content": "'"${USER_QUERY}"'"
 		}
 	]
-}' $OPENAI_URL)
+}' "$OPENAI_URL")
 
 # Extract the reply from the JSON response
 REPLY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed "s/'//g")
@@ -137,15 +140,28 @@ else
 	echo
 	
 	# Ask for user command confirmation
-	read -n 1 -p "${PRE_TEXT}execute command? [y/N]: " answer
-	echo;echo
+	echo -n "${PRE_TEXT}execute command? [y/e/N]: "
+	read -n 1 -r -s answer
+	
+	# Did the user want to edit the command?
 	if [ "$answer" == "Y" ] || [ "$answer" == "y" ]; then
+		echo "yes";echo
 		eval "$CMD"
 		echo
 		# OK
 		echo -e "${OK_TEXT_COLOR}[ok]${RESET_COLOR}"
+	elif [ "$answer" == "E" ] || [ "$answer" == "e" ]; then
+		echo -ne "$CLEAR_LINE\r"
+		echo -n "${PRE_TEXT}edit command: "
+		read -e -r -i "$CMD" CMD
+		echo
+		eval "$CMD"
+		echo;
+		# EDIT
+		echo -e "${OK_TEXT_COLOR}[ok]${RESET_COLOR}"
 	else
 		# CANCEL
+		echo "no";echo
 		echo -e "${CANCEL_TEXT_COLOR}[cancel]${RESET_COLOR}"
 	fi
 	echo
