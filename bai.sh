@@ -12,6 +12,7 @@ NO_REPLY_TEXT="¯\_(ツ)_/¯"
 CMD_BG_COLOR="\e[48;5;236m"
 CMD_TEXT_COLOR="\e[38;5;203m"
 INFO_TEXT_COLOR="\e[90;3m"
+ERROR_TEXT_COLOR="\e[91m"
 CANCEL_TEXT_COLOR="\e[93m"
 OK_TEXT_COLOR="\e[92m"
 RESET_COLOR="\e[0m"
@@ -211,18 +212,33 @@ if [ "$IS_QUESTION" = false ]; then
 	if [ "$answer" == "Y" ] || [ "$answer" == "y" ]; then
 		echo "yes";echo
 		eval "$CMD"
+		
+		# Test if command was successful
+		ret=$?
 		echo
-		# OK
-		echo -e "${OK_TEXT_COLOR}[ok]${RESET_COLOR}"
+		if [ $ret -eq 0 ]; then
+			# OK
+			echo -e "${OK_TEXT_COLOR}[ok]${RESET_COLOR}"
+		else
+			# ERROR
+			echo -e "${ERROR_TEXT_COLOR}[error]${RESET_COLOR}"
+		fi
 	elif [ "$answer" == "E" ] || [ "$answer" == "e" ]; then
 		echo -ne "$CLEAR_LINE\r"
-		echo -n "${PRE_TEXT}edit command: "
-		read -e -r -i "$CMD" CMD
+		read -e -r -p "${PRE_TEXT}edit command: " -i "$CMD" CMD
 		echo
 		eval "$CMD"
+		
+		# Test if edited command was successful
+		ret=$?
 		echo
-		# EDIT
-		echo -e "${OK_TEXT_COLOR}[ok]${RESET_COLOR}"
+		if [ $ret -eq 0 ]; then
+			# OK
+			echo -e "${OK_TEXT_COLOR}[ok]${RESET_COLOR}"
+		else
+			# ERROR
+			echo -e "${ERROR_TEXT_COLOR}[error]${RESET_COLOR}"
+		fi
 	else
 		# CANCEL
 		echo "no";echo
