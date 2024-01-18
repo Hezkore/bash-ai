@@ -1,6 +1,11 @@
 #!/bin/bash
 # -*- Mode: sh; coding: utf-8; indent-tabs-mode: t; tab-width: 4 -*-
 
+# Determine the user's environment
+#OS_INFO=$(uname -s)
+USER_INFO=$(uname -a)
+DISTRO_INFO=$(cat /etc/os-release | grep -oP '(?<=^PRETTY_NAME=").+(?="$)')
+
 # Constants
 PRE_TEXT="  "
 NO_REPLY_TEXT="¯\_(ツ)_/¯"
@@ -12,7 +17,8 @@ OK_TEXT_COLOR="\e[92m"
 RESET_COLOR="\e[0m"
 CLEAR_LINE="\033[2K\r"
 DEFAULT_EXEC_QUERY="Return a JSON object containing 'cmd' and 'info' fields. 'cmd' is the simplest POSIX Bash command for the query. 'info' provides details on what the command does."
-DEFAULT_QUESTION_QUERY="Provide a short single-line plain text answer to the following terminal-related query."
+DEFAULT_QUESTION_QUERY="Provide an answer to the following terminal-related query."
+GLOBAL_QUERY="Always provide single-line, step-by-step, instructions. User is always in the terminal. User is asking information related to $DISTRO_INFO and $USER_INFO."
 
 # Configuration file path
 CONFIG_FILE=~/.config/bai.cfg
@@ -32,7 +38,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
 	} >> "$CONFIG_FILE"
 fi
 
-# Extract OpenAI Key from configuration
+# Read configuration file
 config=$(cat "$CONFIG_FILE")
 
 # API Key
@@ -78,7 +84,7 @@ if [[ "$USER_QUERY" == *"?"* ]]; then
 	
 	OPENAI_MESSAGES='{
         "role": "system",
-        "content": "'"${OPENAI_QUESTION_QUERY}"'"
+        "content": "'"${OPENAI_QUESTION_QUERY} ${GLOBAL_QUERY}"'"
     },
     {
         "role": "user",
@@ -86,7 +92,7 @@ if [[ "$USER_QUERY" == *"?"* ]]; then
     },
     {
         "role": "assistant",
-        "content": "use \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' ls -a \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' to list all files, including hidden ones, in the current directory"
+        "content": "Use \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' ls -a \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' to list all files, including hidden ones, in the current directory"
     },
     {
         "role": "user",
@@ -94,7 +100,7 @@ if [[ "$USER_QUERY" == *"?"* ]]; then
     },
     {
         "role": "assistant",
-        "content": "use \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' ls -aR \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' to list all files recursively, including hidden ones, in the current directory"
+        "content": "Use \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' ls -aR \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' to list all files recursively, including hidden ones, in the current directory"
     },
     {
         "role": "user",
@@ -102,14 +108,22 @@ if [[ "$USER_QUERY" == *"?"* ]]; then
     },
     {
         "role": "assistant",
-        "content": "use \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' echo \\\"hello world\\\" \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' to print the text \\\"hello world\\\" to the terminal"
+        "content": "Type \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' echo \\\"hello world\\\" \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' to print \\\"hello world\\\""
+    },
+    {
+        "role": "user",
+        "content": "how do autocomplete commands?"
+    },
+    {
+        "role": "assistant",
+        "content": "Press the \'${RESET_COLOR}'Tab\'${INFO_TEXT_COLOR}' key to autocomplete commands, file names, and directories"
     },'
 else
 	IS_QUESTION=false
 	
 	OPENAI_MESSAGES='{
         "role": "system",
-        "content": "'"${OPENAI_EXEC_QUERY}"'"
+        "content": "'"${OPENAI_EXEC_QUERY} ${GLOBAL_QUERY}"'"
     },
     {
         "role": "user",
@@ -154,9 +168,6 @@ RESPONSE=$(curl -s -X POST -H "Authorization:Bearer $OPENAI_KEY" -H "Content-Typ
 		}
 	]
 }' "$OPENAI_URL")
-
-#echo $RESPONSE
-#exit 0
 
 # Extract the reply from the JSON response
 REPLY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed "s/'//g")
@@ -209,7 +220,7 @@ if [ "$IS_QUESTION" = false ]; then
 		read -e -r -i "$CMD" CMD
 		echo
 		eval "$CMD"
-		echo;
+		echo
 		# EDIT
 		echo -e "${OK_TEXT_COLOR}[ok]${RESET_COLOR}"
 	else
@@ -222,6 +233,7 @@ if [ "$IS_QUESTION" = false ]; then
 	exit 0
 else
 	# This is a question
-	echo -e "${PRE_TEXT}${INFO_TEXT_COLOR}${REPLY}${RESET_COLOR}"
+	echo -e "${PRE_TEXT}${INFO_TEXT_COLOR}${REPLY} ${RESET_COLOR}"
+	echo
 	exit 0
 fi
