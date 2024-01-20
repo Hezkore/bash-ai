@@ -37,12 +37,12 @@ Bash AI offers the following features:
 - **Persistent Memory**\
 	Remembers your previous requests and uses them to improve future suggestions.
 
-## Installation
+## Setup
 
 <details open>
 <summary><b>Quick Start</b></summary>
 
-* To install Bash AI quickly, you can run the following command:
+* To setup Bash AI quickly, you can run the following command:
 
 ```bash
 curl -sS https://raw.githubusercontent.com/hezkore/bash-ai/main/install.sh | bash
@@ -51,7 +51,7 @@ curl -sS https://raw.githubusercontent.com/hezkore/bash-ai/main/install.sh | bas
 </details>
 
 <details>
-<summary><b>Manual Installation</b></summary>
+<summary><b>Manual Setup</b></summary>
 
 1. Clone or download the repository:
 
