@@ -30,6 +30,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
 	{
 		echo "key="
 		echo ""
+		echo "hi_contrast=false"
 		echo "api=https://api.openai.com/v1/chat/completions"
 		echo "model=gpt-3.5-turbo"
 		echo "temp=0.1"
@@ -68,13 +69,58 @@ OPENAI_QUESTION_QUERY=$(echo "${config[@]}" | grep -oP '(?<=^question_query=).+'
 # Extract maximum token count from configuration
 OPENAI_TOKENS=$(echo "${config[@]}" | grep -oP '(?<=^tokens=).+')
 
-# Apply default query if none is provided
+# Test if high contrast mode is set in configuration
+HI_CONTRAST=$(echo "${config[@]}" | grep -oP '(?<=^hi_contrast=).+')
+if [ "$HI_CONTRAST" = true ]; then
+	INFO_TEXT_COLOR="$RESET_COLOR"
+fi
+
+# Set default query if not provided in configuration
 if [ -z "$OPENAI_EXEC_QUERY" ]; then
 	OPENAI_EXEC_QUERY="$DEFAULT_EXEC_QUERY"
 fi
 if [ -z "$OPENAI_QUESTION_QUERY" ]; then
 	OPENAI_QUESTION_QUERY="$DEFAULT_QUESTION_QUERY"
 fi
+
+# Helper functions
+print_info() {
+	echo -e "${PRE_TEXT}${INFO_TEXT_COLOR}$1${RESET_COLOR}"
+	echo
+}
+
+print_ok() {
+	echo -e "${OK_TEXT_COLOR}$1${RESET_COLOR}"
+	echo
+}
+
+print_error() {
+	echo -e "${ERROR_TEXT_COLOR}$1${RESET_COLOR}"
+	echo
+}
+
+print_cancel() {
+	echo -e "${CANCEL_TEXT_COLOR}$1${RESET_COLOR}"
+	echo
+}
+
+print_cmd() {
+	echo -e "${PRE_TEXT}${CMD_BG_COLOR}${CMD_TEXT_COLOR} $1 ${RESET_COLOR}"
+	echo
+}
+
+run_cmd() {
+	eval "$1"
+	ret=$?
+	echo
+	if [ $ret -eq 0 ]; then
+		# OK
+		print_ok "[ok]"
+	else
+		# ERROR
+		print_error "[error]"
+	fi
+}
 
 # User AI query
 USER_QUERY=$*
@@ -194,15 +240,13 @@ if [ "$IS_QUESTION" = false ]; then
 	
 	# Extract information from response
 	INFO=$(echo "$REPLY" | jq -r '.info')
-	if [ -z "$info" ]; then
-		info="warning: no information"
+	if [ -z "$INFO" ]; then
+		INFO="warning: no information"
 	fi
 	
 	# Print command and information
-	echo -e "${PRE_TEXT}${CMD_BG_COLOR}${CMD_TEXT_COLOR} ${CMD} ${RESET_COLOR}"
-	echo
-	echo -e "${PRE_TEXT}${INFO_TEXT_COLOR}${INFO}${RESET_COLOR}"
-	echo
+	print_cmd "$CMD"
+	print_info "$INFO"
 	
 	# Ask for user command confirmation
 	echo -n "${PRE_TEXT}execute command? [y/e/N]: "
@@ -211,45 +255,21 @@ if [ "$IS_QUESTION" = false ]; then
 	# Did the user want to edit the command?
 	if [ "$answer" == "Y" ] || [ "$answer" == "y" ]; then
 		echo "yes";echo
-		eval "$CMD"
-		
-		# Test if command was successful
-		ret=$?
-		echo
-		if [ $ret -eq 0 ]; then
-			# OK
-			echo -e "${OK_TEXT_COLOR}[ok]${RESET_COLOR}"
-		else
-			# ERROR
-			echo -e "${ERROR_TEXT_COLOR}[error]${RESET_COLOR}"
-		fi
+		run_cmd "$CMD"
 	elif [ "$answer" == "E" ] || [ "$answer" == "e" ]; then
 		echo -ne "$CLEAR_LINE\r"
 		read -e -r -p "${PRE_TEXT}edit command: " -i "$CMD" CMD
 		echo
-		eval "$CMD"
-		
-		# Test if edited command was successful
-		ret=$?
-		echo
-		if [ $ret -eq 0 ]; then
-			# OK
-			echo -e "${OK_TEXT_COLOR}[ok]${RESET_COLOR}"
-		else
-			# ERROR
-			echo -e "${ERROR_TEXT_COLOR}[error]${RESET_COLOR}"
-		fi
+		run_cmd "$CMD"
 	else
 		# CANCEL
 		echo "no";echo
-		echo -e "${CANCEL_TEXT_COLOR}[cancel]${RESET_COLOR}"
+		print_cancel "[cancel]"
 	fi
-	echo
 	
 	exit 0
 else
 	# This is a question
-	echo -e "${PRE_TEXT}${INFO_TEXT_COLOR}${REPLY} ${RESET_COLOR}"
-	echo
+	print_info "$REPLY"
 	exit 0
 fi
