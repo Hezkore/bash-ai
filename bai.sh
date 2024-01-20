@@ -1,11 +1,15 @@
 #!/bin/bash
 # -*- Mode: sh; coding: utf-8; indent-tabs-mode: t; tab-width: 4 -*-
 
+# Bash AI
+# https://github.com/Hezkore/bash-ai
+
 # Determine the user's environment
 USER_INFO=$(uname -a)
 DISTRO_INFO=$(cat /etc/os-release | grep -oP '(?<=^PRETTY_NAME=").+(?="$)')
 
 # Constants
+VERSION="1.0"
 PRE_TEXT="  "
 NO_REPLY_TEXT="¯\_(ツ)_/¯"
 CMD_BG_COLOR="\e[48;5;236m"
@@ -164,7 +168,7 @@ USER_QUERY=$*
 if [ -z "$USER_QUERY" ]; then
 	INTERACTIVE_MODE=true
 	
-	print "${TITLE_TEXT_COLOR}Bash AI 🤖${RESET_COLOR}"
+	print "🤖 ${TITLE_TEXT_COLOR}Bash AI v${VERSION}${RESET_COLOR}"
 	echo
 	print_info "Hi! What can I help you with?"
 else

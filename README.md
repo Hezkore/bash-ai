@@ -36,9 +36,20 @@ Bash AI offers the following features:
 
 ## Installation
 
-All you have to do is run the Bash AI script to get started.
+<details open>
+<summary><b>Quick Start</b></summary>
 
-1. Clone the repository:
+* To install Bash AI quickly, you can run the following command:
+
+```bash
+curl -sS https://raw.githubusercontent.com/hezkore/bash-ai/main/install.sh | bash
+```
+</details>
+
+<details>
+<summary><b>Manual Installation</b></summary>
+
+1. Clone or download the repository:
 
 	```bash
 	git clone https://github.com/hezkore/bash-ai.git
@@ -55,12 +66,21 @@ All you have to do is run the Bash AI script to get started.
 	./bai.sh
 	```
 
-*  _(Optional)_ For convenience, create an alias for the `bai.sh` script in your `.bashrc` file:
+*  _(Optional)_ For convenience, you can create a shortcut to the `bai.sh` script. There are two ways to do this:
 
-	```conf
-	alias bai='path/to/bai.sh'
-	```
-Please replace `path/to/bai.sh` with the actual path to the `bai.sh` script. This step allows you to execute the script using the `bai` command, reducing the need for typing the full path to the script each time.
+	* Create a symbolic link in `/usr/local/bin`. This will allow you to run the script from anywhere, without having to type the full path. Replace `path/to/bai.sh` with the actual path to the `bai.sh` script:
+
+		```bash
+		ln -s path/to/bai.sh /usr/local/bin/bai
+		```
+
+	* Alternatively, you can create an alias for the `bai.sh` script in your `.bashrc` file. This will also allow you to execute the script using the `bai` command, reducing the need for typing the full path to the script each time. Replace `path/to/bai.sh` with the actual path to the `bai.sh` script:
+
+		```conf
+		alias bai='path/to/bai.sh'
+		```
+
+</details>
 
 ## Configuration
 
@@ -79,9 +99,9 @@ You can also change the model, temperature and query in this file.
 
 Bash AI operates in two modes: Interactive Mode and Command Mode.
 
-To enter Interactive Mode, you simply run `bai` _(or `./bai.sh` if you didn't add `bai` as an alias in your .bashrc file)_ without any request. This allows you to continuously interact with Bash AI without needing to re-run the command.
+To enter Interactive Mode, you simply run `bai` without any request. This allows you to continuously interact with Bash AI without needing to re-run the command.
 
-In Command Mode, you run `bai` followed by your request, like so: `bai your request here` _(or `./bai.sh your request here` if you didn't add `bai` as an alias in your .bashrc file)_.
+In Command Mode, you run `bai` followed by your request, like so: `bai your request here`
 
 Example usage:
 
