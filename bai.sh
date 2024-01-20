@@ -17,6 +17,8 @@ CANCEL_TEXT_COLOR="\e[93m"
 OK_TEXT_COLOR="\e[92m"
 RESET_COLOR="\e[0m"
 CLEAR_LINE="\033[2K\r"
+HIDE_CURSOR="\e[?25l"
+SHOW_CURSOR="\e[?25h"
 DEFAULT_EXEC_QUERY="Return a JSON object containing 'cmd' and 'info' fields. 'cmd' is the simplest POSIX Bash command for the query. 'info' provides details on what the command does."
 DEFAULT_QUESTION_QUERY="Provide an answer to the following terminal-related query."
 GLOBAL_QUERY="Always provide single-line, step-by-step instructions. User is always in the terminal. Query is related to $DISTRO_INFO and $USER_INFO."
@@ -127,6 +129,7 @@ USER_QUERY=$*
 
 # Determine if we should use the question query or the execution query
 if [[ "$USER_QUERY" == *"?"* ]]; then
+	# QUESTION
 	OPENAI_MESSAGES='{
         "role": "system",
         "content": "'"${OPENAI_QUESTION_QUERY} ${GLOBAL_QUERY}"'"
@@ -164,6 +167,7 @@ if [[ "$USER_QUERY" == *"?"* ]]; then
         "content": "Press the \'${RESET_COLOR}'Tab\'${INFO_TEXT_COLOR}' key to autocomplete commands, file names, and directories"
     },'
 else
+	# COMMAND
 	OPENAI_MESSAGES='{
         "role": "system",
         "content": "'"${OPENAI_EXEC_QUERY} ${GLOBAL_QUERY}"'"
@@ -195,8 +199,22 @@ else
 fi
 
 # Notify the user about our progress
-echo
-echo -ne "${PRE_TEXT}Thinking...\r"
+echo -e "$HIDE_CURSOR"
+echo -ne "${PRE_TEXT}  Thinking..."
+
+# Start the spinner in the background
+spinner() {
+	local chars="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+	while :; do
+		for (( i=0; i<${#chars}; i++ )); do
+			sleep 0.1
+			# Print a carriage return (\r) and then the spinner character
+			echo -ne "\r${PRE_TEXT}${chars:$i:1}"
+		done
+	done
+}
+spinner & # Start the spinner
+spinner_pid=$! # Save the spinner's PID
 
 # Send request to OpenAI API
 RESPONSE=$(curl -s -X POST -H "Authorization:Bearer $OPENAI_KEY" -H "Content-Type:application/json" -d '{
@@ -211,6 +229,11 @@ RESPONSE=$(curl -s -X POST -H "Authorization:Bearer $OPENAI_KEY" -H "Content-Typ
 		}
 	]
 }' "$OPENAI_URL")
+
+# Stop the spinner
+kill $spinner_pid
+wait $spinner_pid 2>/dev/null
+echo -ne "$SHOW_CURSOR"
 
 # Extract the reply from the JSON response
 REPLY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed "s/'//g")
