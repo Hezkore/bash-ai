@@ -26,6 +26,10 @@ GLOBAL_QUERY="Always provide single-line, step-by-step instructions. User is alw
 # Configuration file path
 CONFIG_FILE=~/.config/bai.cfg
 
+# Hide the cursor while we're working
+trap 'echo -ne "$SHOW_CURSOR"' EXIT
+echo -e "$HIDE_CURSOR"
+
 # Check for configuration file existence
 if [ ! -f "$CONFIG_FILE" ]; then
 	# Initialize configuration file with default values
@@ -199,7 +203,6 @@ else
 fi
 
 # Notify the user about our progress
-echo -e "$HIDE_CURSOR"
 echo -ne "${PRE_TEXT}  Thinking..."
 
 # Start the spinner in the background
