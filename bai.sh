@@ -23,9 +23,9 @@ RESET_COLOR="\e[0m"
 CLEAR_LINE="\033[2K\r"
 HIDE_CURSOR="\e[?25l"
 SHOW_CURSOR="\e[?25h"
-DEFAULT_EXEC_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' is the simplest POSIX Bash command for the query. 'info' provides details on what the command does."
-DEFAULT_QUESTION_QUERY="Provide a short answer to the following terminal-related query."
-GLOBAL_QUERY="You are Bash AI (bai). Always provide single-line, step-by-step instructions. User is always in the terminal. Query is related distro $DISTRO_INFO and $USER_INFO. Username is $USER at $HOME"
+DEFAULT_EXEC_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' is the simplest Bash command for the query. 'info' provides details on what the command does."
+DEFAULT_QUESTION_QUERY="Return nothing but a short text answer to the following terminal-related query."
+GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. Always provide single-line, step-by-step instructions. User is always in the terminal. Query is related distro $DISTRO_INFO and $USER_INFO. Use only POSIX-compliant commands. Username is $USER at $HOME"
 HISTORY_MESSAGES=""
 
 # Configuration file path
@@ -151,7 +151,7 @@ run_cmd() {
 		# Did the user want to examine the error?
 		if [ "$answer" == "Y" ] || [ "$answer" == "y" ]; then
 			echo "yes";echo
-			USER_QUERY="You executed \"$1\". Which returned error \"$output\". Explain the error message and how to fix it in less than $OPENAI_TOKENS characters. Or return nothing but a JSON object with 'cmd' to fix it and 'info' explaining the error and why cmd will fix it."
+			USER_QUERY="You executed \"$1\". Which returned error \"$output\". Explain the error message and how to fix it in less than $OPENAI_TOKENS characters. Or return nothing but a JSON object with 'cmd' to fix it and 'info' explaining what happened and why cmd will fix it."
 			NEEDS_TO_RUN=true
 		else
 			echo "no";echo
