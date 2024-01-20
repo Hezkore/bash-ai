@@ -89,15 +89,15 @@ curl -sS https://raw.githubusercontent.com/hezkore/bash-ai/main/install.sh | bas
 ## Configuration
 
 On the first run, a configuration file named `bai.cfg` will be created in your `~/.config` directory.\
-You must provide your OpenAI key in the `key=` field of this file. The OpenAI key can be obtained from your OpenAI account.
+You must provide a [OpenAI API key](https://platform.openai.com/api-keys) in the `key=` field of this file. The [OpenAI API key](https://platform.openai.com/api-keys) can be obtained from your [OpenAI account](https://platform.openai.com/api-keys).
 
 > [!CAUTION]
 > Keeping the key in a plain text file is dangerous, and it is your responsibility to keep it secure.
 
-You can also change the model, temperature and query in this file.
+You can also change the [GPT model](https://platform.openai.com/docs/models) and [temperature](https://platform.openai.com/docs/api-reference/chat/create#chat-create-temperature) this file.
 
 > [!TIP]
-> The `gpt-4` models produce much better results than the standard `gpt-3.5-turbo` model.
+> The `gpt-4` models may produce much better results than the standard `gpt-3.5-turbo` model, but is also slower.
 
 ## Usage
 
