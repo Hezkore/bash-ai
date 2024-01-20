@@ -151,7 +151,7 @@ run_cmd() {
 		# Did the user want to examine the error?
 		if [ "$answer" == "Y" ] || [ "$answer" == "y" ]; then
 			echo "yes";echo
-			USER_QUERY="You executed: $1. Which returned error: $output. Explain the error message and how to fix it in less than $OPENAI_TOKENS characters. Or return nothing but a JSON object with 'cmd' to fix it and 'info' explaining the error and why cmd will fix it."
+			USER_QUERY="You executed \"$1\". Which returned error \"$output\". Explain the error message and how to fix it in less than $OPENAI_TOKENS characters. Or return nothing but a JSON object with 'cmd' to fix it and 'info' explaining the error and why cmd will fix it."
 			NEEDS_TO_RUN=true
 		else
 			echo "no";echo
