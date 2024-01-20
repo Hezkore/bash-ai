@@ -233,13 +233,13 @@ RESPONSE=$(curl -s -X POST -H "Authorization:Bearer $OPENAI_KEY" -H "Content-Typ
 # Stop the spinner
 kill $spinner_pid
 wait $spinner_pid 2>/dev/null
-echo -ne "$SHOW_CURSOR"
 
 # Extract the reply from the JSON response
 REPLY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed "s/'//g")
 
 # Process the reply
 echo -ne "$CLEAR_LINE\r"
+echo -ne "$SHOW_CURSOR"
 if [ -z "$REPLY" ]; then
 	# We didn't get a reply
 	echo "${PRE_TEXT}${NO_REPLY_TEXT}"
