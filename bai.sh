@@ -127,8 +127,6 @@ USER_QUERY=$*
 
 # Determine if we should use the question query or the execution query
 if [[ "$USER_QUERY" == *"?"* ]]; then
-	IS_QUESTION=true
-	
 	OPENAI_MESSAGES='{
         "role": "system",
         "content": "'"${OPENAI_QUESTION_QUERY} ${GLOBAL_QUERY}"'"
@@ -166,8 +164,6 @@ if [[ "$USER_QUERY" == *"?"* ]]; then
         "content": "Press the \'${RESET_COLOR}'Tab\'${INFO_TEXT_COLOR}' key to autocomplete commands, file names, and directories"
     },'
 else
-	IS_QUESTION=false
-	
 	OPENAI_MESSAGES='{
         "role": "system",
         "content": "'"${OPENAI_EXEC_QUERY} ${GLOBAL_QUERY}"'"
@@ -227,17 +223,13 @@ if [ -z "$REPLY" ]; then
 	exit 1
 fi
 
-# Determine if this is regarding a question or not
-if [ "$IS_QUESTION" = false ]; then
-	# Extract command from response
-	CMD=$(echo "$REPLY" | jq -r '.cmd')
-	if [ -z "$CMD" ]; then
-		# If command is empty, print no reply text
-		echo
-		echo "${PRE_TEXT}${NO_REPLY_TEXT}"
-		exit 1
-	fi
-	
+# Extract command from response
+CMD=$(echo "$REPLY" | jq -e -r '.cmd' 2>/dev/null)
+if [ $? -ne 0 ] || [ -z "$CMD" ]; then
+	# No command, show reply
+	print_info "$REPLY"
+	exit 0
+else
 	# Extract information from response
 	INFO=$(echo "$REPLY" | jq -r '.info')
 	if [ -z "$INFO" ]; then
@@ -254,9 +246,11 @@ if [ "$IS_QUESTION" = false ]; then
 	
 	# Did the user want to edit the command?
 	if [ "$answer" == "Y" ] || [ "$answer" == "y" ]; then
+		# RUN
 		echo "yes";echo
 		run_cmd "$CMD"
 	elif [ "$answer" == "E" ] || [ "$answer" == "e" ]; then
+		# EDIT
 		echo -ne "$CLEAR_LINE\r"
 		read -e -r -p "${PRE_TEXT}edit command: " -i "$CMD" CMD
 		echo
@@ -267,9 +261,5 @@ if [ "$IS_QUESTION" = false ]; then
 		print_cancel "[cancel]"
 	fi
 	
-	exit 0
-else
-	# This is a question
-	print_info "$REPLY"
 	exit 0
 fi
