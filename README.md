@@ -97,7 +97,7 @@ You must provide a [OpenAI API key](https://platform.openai.com/api-keys) in the
 You can also change the [GPT model](https://platform.openai.com/docs/models) and [temperature](https://platform.openai.com/docs/api-reference/chat/create#chat-create-temperature) this file.
 
 > [!TIP]
-> The `gpt-4` models may produce much better results than the standard `gpt-3.5-turbo` model, but is also slower.
+> The `gpt-4` models may produce better results than the standard `gpt-3.5-turbo` model, but is also slower.
 
 ## Usage
 
