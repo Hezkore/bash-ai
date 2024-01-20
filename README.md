@@ -1,6 +1,7 @@
 # Bash AI
 
-Bash AI _(bai)_ is a bash shell script that acts as an AI assistant, allowing you to ask questions and perform terminal-based tasks using natural language. It provides answers and command suggestions based on your input and allows you to execute or edit the suggested commands if desired.
+Bash AI _(bai)_ is a bash shell script that acts as an AI assistant, inspired by [Your AI _(yai)_](https://github.com/ekkinox/yai).\
+Leveraging OpenAI's capabilities, it allows you to ask questions and perform terminal-based tasks using natural language. It provides answers and command suggestions based on your input and allows you to execute or edit the suggested commands if desired.
 
 ## Features
 
@@ -48,6 +49,13 @@ All you have to do is run the Bash AI script to get started.
 	./bai.sh
 	```
 
+*  _(Optional)_ For convenience, create an alias for the `bai.sh` script in your `.bashrc` file:
+
+	```conf
+	alias bai='path/to/bai.sh'
+	```
+Please replace `path/to/bai.sh` with the actual path to the `bai.sh` script. This step allows you to execute the script using the `bai` command, reducing the need for typing the full path to the script each time.
+
 ## Configuration
 
 On the first run, a configuration file named `bai.cfg` will be created in your `~/.config` directory.\
@@ -63,33 +71,29 @@ You can also change the model, temperature and query in this file.
 
 ## Usage
 
-Run `./bai.sh your request here` and Bash AI will return a command suggestion for your request.\
+Run `bai your request here` _(or `./bai.sh your request here` if you didn't add `bai` as an alias in your bashrc file)_ and Bash AI will return a command suggestion for your request.\
 For example:
 
 ```
-./bai.sh create a new directory with a name of your choice, then create a text file inside it
+bai create a new directory with a name of your choice, then create a text file inside it
 ```
 
 You can also ask questions by ending your request with a question mark:
 
 ```
-./bai.sh what is the current time?
+bai what is the current time?
 ```
+
+You can also simply run `bai` _(or `./bai.sh` if you didn't add `bai` as an alias in your bashrc file)_ without any request to enter Interactive Mode.
 
 ## Prerequisites
 
 - [OpenAI account and API key](https://platform.openai.com/apps)
-- [Curl](https://curl.se/download.html)
-- [JQ](https://stedolan.github.io/jq/download/)
+- [curl](https://curl.se/download.html)
+- [jq](https://stedolan.github.io/jq/download/)
 
 ## Known Issues
 
-- Single quotes will cause your request to fail.\
+- Single quotes will cause your request to fail outside of Interactive Mode.\
 	For example, `./bai.sh what's the current time?` will fail, but both `./bai.sh whats the current time?` and `./bai.sh what is the current time?` will succeed.\
-	This is a limitation of the terminal.
-
-## License
-
-This project is licensed under the GNU General Public License v3.0 (GPLv3). This means you are free to use, modify, and distribute the original or modified content. However, if you modify the code, you are required to distribute your changes under the same license, thereby contributing your changes back to the community.
-
-For more information, please see the [GPLv3 FAQ](https://www.gnu.org/licenses/gpl-faq.html).
+	This is a limitation of the terminal, not present when using `bai` in Interactive Mode.
