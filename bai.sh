@@ -22,6 +22,7 @@ SHOW_CURSOR="\e[?25h"
 DEFAULT_EXEC_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' is the simplest POSIX Bash command for the query. 'info' provides details on what the command does."
 DEFAULT_QUESTION_QUERY="Provide a short answer to the following terminal-related query."
 GLOBAL_QUERY="You are Bash AI (bai). Always provide single-line, step-by-step instructions. User is always in the terminal. Query is related distro $DISTRO_INFO and $USER_INFO. Username is $USER at $HOME"
+HISTORY_MESSAGES=""
 
 # Configuration file path
 CONFIG_FILE=~/.config/bai.cfg
@@ -288,6 +289,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		"temperature": '"$OPENAI_TEMP"',
 		"messages": [
 			'"$OPENAI_MESSAGES"'
+			'"$HISTORY_MESSAGES"'
 			{
 				"role": "user",
 				"content": "'"${USER_QUERY}"'"
@@ -298,9 +300,6 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 	# Stop the spinner
 	kill $spinner_pid
 	wait $spinner_pid 2>/dev/null
-	
-	# Reset user query
-	USER_QUERY=""
 	
 	# Reset the needs to run flag
 	NEEDS_TO_RUN=false
@@ -314,7 +313,23 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		# We didn't get a reply
 		print_info "$NO_REPLY_TEXT"
 		echo -ne "$SHOW_CURSOR"
+		# Reset user query
+		USER_QUERY=""
 	else
+		# We got a reply
+		# Append it to history
+		HISTORY_MESSAGES+='{
+			"role": "user",
+			"content": "'"${USER_QUERY}"'"
+		},
+		{
+			"role": "assistant",
+			"content": "'"$(json_safe "$REPLY")"'"
+		},'
+		
+		# Reset user query
+		USER_QUERY=""
+		
 		# Extract command from the reply
 		CMD=$(echo "$REPLY" | jq -e -r '.cmd' 2>/dev/null)
 		if [ $? -ne 0 ] || [ -z "$CMD" ]; then
