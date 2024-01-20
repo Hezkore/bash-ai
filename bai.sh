@@ -20,8 +20,8 @@ CLEAR_LINE="\033[2K\r"
 HIDE_CURSOR="\e[?25l"
 SHOW_CURSOR="\e[?25h"
 DEFAULT_EXEC_QUERY="Return a JSON object containing 'cmd' and 'info' fields. 'cmd' is the simplest POSIX Bash command for the query. 'info' provides details on what the command does."
-DEFAULT_QUESTION_QUERY="Provide an answer to the following terminal-related query."
-GLOBAL_QUERY="Always provide single-line, step-by-step instructions. User is always in the terminal. Query is related to $DISTRO_INFO and $USER_INFO."
+DEFAULT_QUESTION_QUERY="Provide a short answer to the following terminal-related query."
+GLOBAL_QUERY="You are Bash AI (bai). Always provide single-line, step-by-step instructions. User is always in the terminal. Query is related to $DISTRO_INFO and $USER_INFO."
 
 # Configuration file path
 CONFIG_FILE=~/.config/bai.cfg
@@ -54,7 +54,18 @@ OPENAI_KEY=$(echo "${config[@]}" | grep -oP '(?<=^key=).+')
 if [ -z "$OPENAI_KEY" ]; then
 	 # Prompt user to input OpenAI key if not found
 	echo "To use bai, please input your OpenAI key into the config file located at $CONFIG_FILE"
+	echo -ne "$SHOW_CURSOR"
 	exit 1
+fi
+
+# User AI query
+USER_QUERY=$*
+# Is there a query?
+if [ -z "$USER_QUERY" ]; then
+	# No query, prompt user for query
+	echo -ne "$SHOW_CURSOR"
+	read -e -r -p "Bash AI> " USER_QUERY
+	echo -e "$HIDE_CURSOR"
 fi
 
 # Extract OpenAI URL from configuration
@@ -116,7 +127,7 @@ print_cmd() {
 }
 
 run_cmd() {
-	eval "$1"
+	output=$(eval "$1" 2>&1)
 	ret=$?
 	echo
 	if [ $ret -eq 0 ]; then
@@ -124,12 +135,10 @@ run_cmd() {
 		print_ok "[ok]"
 	else
 		# ERROR
+		echo "${output#*"$0": line *: }"
 		print_error "[error]"
 	fi
 }
-
-# User AI query
-USER_QUERY=$*
 
 # Determine if we should use the question query or the execution query
 if [[ "$USER_QUERY" == *"?"* ]]; then
@@ -242,10 +251,10 @@ REPLY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed "s/'//g")
 
 # Process the reply
 echo -ne "$CLEAR_LINE\r"
-echo -ne "$SHOW_CURSOR"
 if [ -z "$REPLY" ]; then
 	# We didn't get a reply
-	echo "${PRE_TEXT}${NO_REPLY_TEXT}"
+	print_info "$NO_REPLY_TEXT"
+	echo -ne "$SHOW_CURSOR"
 	exit 1
 fi
 
@@ -254,6 +263,7 @@ CMD=$(echo "$REPLY" | jq -e -r '.cmd' 2>/dev/null)
 if [ $? -ne 0 ] || [ -z "$CMD" ]; then
 	# No command, show reply
 	print_info "$REPLY"
+	echo -ne "$SHOW_CURSOR"
 	exit 0
 else
 	# Extract information from response
@@ -268,6 +278,7 @@ else
 	
 	# Ask for user command confirmation
 	echo -n "${PRE_TEXT}execute command? [y/e/N]: "
+	echo -ne "$SHOW_CURSOR"
 	read -n 1 -r -s answer
 	
 	# Did the user want to edit the command?
