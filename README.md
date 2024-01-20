@@ -106,12 +106,12 @@ In Command Mode, you run `bai` followed by your request, like so: `bai your requ
 
 Example usage:
 
-```bash
+```
 bai create a new directory with a name of your choice, then create a text file inside it
 ```
 
 You can also ask questions  by ending your request with a question mark:
-```bash
+```
 bai what is the current time?
 ```
 
