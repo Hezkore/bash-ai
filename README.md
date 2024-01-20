@@ -7,6 +7,9 @@ Leveraging OpenAI's capabilities, it allows you to ask questions and perform ter
 
 Bash AI offers the following features:
 
+- **100% Shell Script**\
+	No need to install anything. Just run it!
+
 - **Natural Language Interface**\
 	Communicate with the terminal using everyday language.
 	
