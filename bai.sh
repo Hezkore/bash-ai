@@ -58,7 +58,7 @@ config=$(cat "$CONFIG_FILE")
 OPENAI_KEY=$(echo "${config[@]}" | grep -oP '(?<=^key=).+')
 if [ -z "$OPENAI_KEY" ]; then
 	 # Prompt user to input OpenAI key if not found
-	echo "To use bai, please input your OpenAI key into the config file located at $CONFIG_FILE"
+	echo "To use Bash AI, please input your OpenAI key into the config file located at $CONFIG_FILE"
 	echo -ne "$SHOW_CURSOR"
 	exit 1
 fi
