@@ -9,7 +9,7 @@ USER_INFO=$(uname -a)
 DISTRO_INFO=$(cat /etc/os-release | grep -oP '(?<=^PRETTY_NAME=").+(?="$)')
 
 # Constants
-VERSION="1.0"
+VERSION="1.0.1"
 PRE_TEXT="  "
 NO_REPLY_TEXT="¯\_(ツ)_/¯"
 CMD_BG_COLOR="\e[48;5;236m"
@@ -23,9 +23,10 @@ RESET_COLOR="\e[0m"
 CLEAR_LINE="\033[2K\r"
 HIDE_CURSOR="\e[?25l"
 SHOW_CURSOR="\e[?25h"
-DEFAULT_EXEC_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' is the simplest Bash command for the query. 'info' provides details on what the command does."
-DEFAULT_QUESTION_QUERY="Return nothing but a short text answer to the following terminal-related query."
-GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. Always provide single-line, step-by-step instructions. User is always in the terminal. Query is related distro $DISTRO_INFO and $USER_INFO. Use only POSIX-compliant commands. Username is $USER at $HOME"
+DEFAULT_EXEC_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' must contain the simplest Bash command for the query. 'info' must inform what 'cmd' does."
+DEFAULT_QUESTION_QUERY="Return nothing but a JSON object containing a 'info' field. 'info' must provide a terminal-related answer to the query."
+DEFAULT_ERROR_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' is optional. 'cmd' is the simplest Bash command to fix, solve or repair the error in the query. 'info' must explain what the error in the query means, why it happened, and why 'cmd' might fix it."
+GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. Always provide single-line, step-by-step instructions. User is always in the terminal. Query refers to distro $DISTRO_INFO and $USER_INFO. Use only POSIX-compliant commands. Username is $USER with home $HOME."
 HISTORY_MESSAGES=""
 
 # Configuration file path
@@ -42,12 +43,17 @@ if [ ! -f "$CONFIG_FILE" ]; then
 		echo "key="
 		echo ""
 		echo "hi_contrast=false"
+		echo "expose_current_dir=true"
+		echo "expose_dir_content=true"
+		echo "max_dir_content=50"
 		echo "api=https://api.openai.com/v1/chat/completions"
 		echo "model=gpt-3.5-turbo"
+		echo "json_mode=false"
 		echo "temp=0.1"
 		echo "tokens=100"
 		echo "exec_query="
 		echo "question_query="
+		echo "error_query="
 	} >> "$CONFIG_FILE"
 fi
 
@@ -78,6 +84,9 @@ OPENAI_EXEC_QUERY=$(echo "${config[@]}" | grep -oP '(?<=^exec_query=).+')
 # Extract OpenAI system question query from configuration
 OPENAI_QUESTION_QUERY=$(echo "${config[@]}" | grep -oP '(?<=^question_query=).+')
 
+# Extract OpenAI system error query from configuration
+OPENAI_ERROR_QUERY=$(echo "${config[@]}" | grep -oP '(?<=^error_query=).+')
+
 # Extract maximum token count from configuration
 OPENAI_TOKENS=$(echo "${config[@]}" | grep -oP '(?<=^tokens=).+')
 
@@ -87,6 +96,23 @@ if [ "$HI_CONTRAST" = true ]; then
 	INFO_TEXT_COLOR="$RESET_COLOR"
 fi
 
+# Test if we should expose current dir
+EXPOSE_CURRENT_DIR=$(echo "${config[@]}" | grep -oP '(?<=^expose_current_dir=).+')
+
+# Test if we should expose dir content
+EXPOSE_DIR_CONTENT=$(echo "${config[@]}" | grep -oP '(?<=^expose_dir_content=).+')
+
+# Extract maximum directory content count from configuration
+MAX_DIRECTORY_CONTENT=$(echo "${config[@]}" | grep -oP '(?<=^max_dir_content=).+')
+
+# Test if GPT JSON mode is set in configuration
+JSON_MODE=$(echo "${config[@]}" | grep -oP '(?<=^json_mode=).+')
+if [ "$JSON_MODE" = true ]; then
+	JSON_MODE="\"response_format\": { \"type\": \"json_object\" },"
+else
+	JSON_MODE=""
+fi
+
 # Set default query if not provided in configuration
 if [ -z "$OPENAI_EXEC_QUERY" ]; then
 	OPENAI_EXEC_QUERY="$DEFAULT_EXEC_QUERY"
@@ -94,10 +120,15 @@ fi
 if [ -z "$OPENAI_QUESTION_QUERY" ]; then
 	OPENAI_QUESTION_QUERY="$DEFAULT_QUESTION_QUERY"
 fi
+if [ -z "$OPENAI_ERROR_QUERY" ]; then
+	OPENAI_ERROR_QUERY="$DEFAULT_ERROR_QUERY"
+fi
 
 # Helper functions
 print_info() {
-	echo -e "${PRE_TEXT}${INFO_TEXT_COLOR}$1${RESET_COLOR}"
+	echo -ne "${PRE_TEXT}${INFO_TEXT_COLOR}"
+	echo -n "$1"
+	echo -e "${RESET_COLOR}"
 	echo
 }
 
@@ -117,7 +148,9 @@ print_cancel() {
 }
 
 print_cmd() {
-	echo -e "${PRE_TEXT}${CMD_BG_COLOR}${CMD_TEXT_COLOR} $1 ${RESET_COLOR}"
+	echo -ne "${PRE_TEXT}${CMD_BG_COLOR}${CMD_TEXT_COLOR}"
+	echo -n " $1 "
+	echo -e "${RESET_COLOR}"
 	echo
 }
 
@@ -139,7 +172,8 @@ run_cmd() {
 	else
 		# ERROR
 		output=$(cat "$tmpfile")
-		echo "${output#*"$0": line *: }"
+		LAST_ERROR="${output#*"$0": line *: }"
+		echo "$LAST_ERROR"
 		print_error "[error]"
 		rm "$tmpfile"
 		
@@ -151,7 +185,8 @@ run_cmd() {
 		# Did the user want to examine the error?
 		if [ "$answer" == "Y" ] || [ "$answer" == "y" ]; then
 			echo "yes";echo
-			USER_QUERY="You executed \"$1\". Which returned error \"$output\". Explain the error message and how to fix it in less than $OPENAI_TOKENS characters. Or return nothing but a JSON object with 'cmd' to fix it and 'info' explaining what happened and why cmd will fix it."
+			USER_QUERY="You executed \"$1\". Which returned error \"$LAST_ERROR\"."
+			QUERY_TYPE="error"
 			NEEDS_TO_RUN=true
 		else
 			echo "no";echo
@@ -167,7 +202,6 @@ USER_QUERY=$*
 # Are we entering interactive mode?
 if [ -z "$USER_QUERY" ]; then
 	INTERACTIVE_MODE=true
-	
 	print "🤖 ${TITLE_TEXT_COLOR}Bash AI v${VERSION}${RESET_COLOR}"
 	echo
 	print_info "Hi! What can I help you with?"
@@ -195,13 +229,24 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 	
 	# Make sure the query is JSON safe
 	USER_QUERY=$(json_safe "$USER_QUERY")
+	USER_QUERY="${USER_QUERY%\\n}"
 	
 	echo -ne "$HIDE_CURSOR"
 	
 	# Determine if we should use the question query or the execution query
-	if [[ "$USER_QUERY" == *"?"* ]]; then
+	if [ -z "$QUERY_TYPE" ]; then
+		if [[ "$USER_QUERY" == *"?"* ]]; then
+			QUERY_TYPE="question"
+		else
+			QUERY_TYPE="execute"
+		fi
+	fi
+	
+	# Apply the correct query message history
+	# The options are "execute", "question" and "error"
+	if [ "$QUERY_TYPE" == "question" ]; then
 		# QUESTION
-		OPENAI_MESSAGES='{
+		OPENAI_TEMPLATE_MESSAGES='{
 			"role": "system",
 			"content": "'"${OPENAI_QUESTION_QUERY} ${GLOBAL_QUERY}"'"
 		},
@@ -211,7 +256,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "Use \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' ls -a \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' to list all files, including hidden ones, in the current directory"
+			"content": "{ \"info\": \"Use ls -a to list all files, including hidden ones, in the current directory.\" }"
 		},
 		{
 			"role": "user",
@@ -219,7 +264,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "Use \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' ls -aR \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' to list all files recursively, including hidden ones, in the current directory"
+			"content": "{ \"info\": \"Use ls -aR to list all files recursively, including hidden ones, in the current directory.\" }"
 		},
 		{
 			"role": "user",
@@ -227,7 +272,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "Type \'${CMD_BG_COLOR}'\'${CMD_TEXT_COLOR}' echo \\\"hello world\\\" \'${RESET_COLOR}'\'${INFO_TEXT_COLOR}' and press \'${RESET_COLOR}'Enter\'${INFO_TEXT_COLOR}' to print \\\"hello world\\\""
+			"content": "{ \"info\": \"Type echo \\\"hello world\\\" and press Enter to print \\\"hello world\\\".\" }"
 		},
 		{
 			"role": "user",
@@ -235,11 +280,41 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "Press the \'${RESET_COLOR}'Tab\'${INFO_TEXT_COLOR}' key to autocomplete commands, file names, and directories"
-		},'
+			"content": "{ \"info\": \"Press the Tab key to autocomplete commands, file names, and directories.\" }"
+		}'
+	elif [ "$QUERY_TYPE" == "error" ]; then
+		# ERROR
+		OPENAI_TEMPLATE_MESSAGES='{
+			"role": "system",
+			"content": "'"${OPENAI_ERROR_QUERY} ${GLOBAL_QUERY}"'"
+		},
+		{
+			"role": "user",
+			"content": "You executed \\\"start avidemux\\\". Which returned error \\\"avidemux: command not found\\\"."
+		},
+		{
+			"role": "assistant",
+			"content": "{ \"cmd\": \"sudo install avidemux\", \"info\": \"This means that the application \\\"avidemux\\\" was not found. Try installing it.\" }"
+		},
+		{
+			"role": "user",
+			"content": "You executed \\\"cd \\\"hell word\\\"\\\". Which returned error \\\"cd: hell word: No such file or directory\\\"."
+		},
+		{
+			"role": "assistant",
+			"content": "{ \"cmd\": \"cd \\\"wORLD helloz\\\"\", \"info\": \"The error indicates that the \\\"wORLD helloz\\\" directory does not exist. But this directory contains a \\\"hello world\\\" directory we can try instead.\" }"
+		},
+		{
+			"role": "user",
+			"content": "You executed \\\"cat \\\"in .sh.\\\"\\\". Which returned error \\\"cat: in .sh: No such file or directory\\\"."
+		},
+		{
+			"role": "assistant",
+			"content": "{ \"cmd\": \"cat \\\"install.sh\\\"\", \"info\": \"The cat command could not find the \\\"in .sh\\\" file in the current directory. But I found a similar file called \\\"install.sh\\\".\" }"
+		}'
 	else
 		# COMMAND
-		OPENAI_MESSAGES='{
+		OPENAI_TEMPLATE_MESSAGES='{
 			"role": "system",
 			"content": "'"${OPENAI_EXEC_QUERY} ${GLOBAL_QUERY}"'"
 		},
@@ -253,11 +328,19 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "user",
-			"content": "recursively list all the files"
+			"content": "recursively list all the files in \\\"My Downloads\\\""
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"cmd\": \"ls -aR\", \"info\": \"list all files recursively, including hidden ones, in the current directory\" }"
+			"content": "{ \"cmd\": \"ls -aR \\\"My Downloads\\\"\", \"info\": \"list all files in \\\"My Downloads\\\" recursively, including hidden ones\" }"
+		},
+		{
+			"role": "user",
+			"content": "start avidemux"
+		},
+		{
+			"role": "assistant",
+			"content": "{ \"cmd\": \"avidemux\", \"info\": \"start the Avidemux video editor, if it'\''s installed on the system and available for the current user\" }"
 		},
 		{
 			"role": "user",
@@ -265,8 +348,24 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"cmd\": \"echo \\\"hello world\\\"\", \"info\": \"print the text \\\"hello world\\\" to the terminal\" }"
-		},'
+			"content": "{ \"cmd\": \"echo \\\"hello world\\\"\", \"info\": \"print the text \\\"hello world\\\"\" }"
+		},
+		{
+			"role": "user",
+			"content": "remove the hello world folder"
+		},
+		{
+			"role": "assistant",
+			"content": "{ \"cmd\": \"rm -r  \\\"hello world\\\"\", \"info\": \"remove the \\\"hello world\\\" folder and its contents recursively\" }"
+		},
+		{
+			"role": "user",
+			"content": "move into the hello world folder"
+		},
+		{
+			"role": "assistant",
+			"content": "{ \"cmd\": \"cd \\\"hello world\\\"\", \"info\": \"move into the \\\"hello world\\\" folder\" }"
+		}'
 	fi
 	
 	# Notify the user about our progress
@@ -286,20 +385,44 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 	spinner & # Start the spinner
 	spinner_pid=$! # Save the spinner's PID
 	
-	# Send request to OpenAI API
-	RESPONSE=$(curl -s -X POST -H "Authorization:Bearer $OPENAI_KEY" -H "Content-Type:application/json" -d '{
+	# Directory and content exposure
+	tmp_msg=""
+	# Check if EXPOSE_CURRENT_DIR is true
+	if [ "$EXPOSE_CURRENT_DIR" = true ]; then
+		tmp_msg+="User is in directory $(json_safe "$(pwd)"). "
+	fi
+	# Check if EXPOSE_DIR_CONTENT is true
+	if [ "$EXPOSE_DIR_CONTENT" = true ]; then
+		tmp_msg+="Current directory contains $(json_safe "$(ls -1F | head -n $MAX_DIRECTORY_CONTENT)")."
+	fi
+	# Apply the directory and content message to the message history
+	HISTORY_MESSAGES+=',{
+		"role": "system",
+		"content": "'"${tmp_msg}"'"
+	}'
+	
+	# Apply the user query to the message history
+	HISTORY_MESSAGES+=',{
+		"role": "user",
+		"content": "'"${USER_QUERY}"'. Entire return must be shorter than '"${OPENAI_TOKENS}"' tokens."
+	}'
+	
+	# Construct the JSON payload
+	JSON_PAYLOAD='{
 		"model": "'"$OPENAI_MODEL"'",
 		"max_tokens": '"$OPENAI_TOKENS"',
 		"temperature": '"$OPENAI_TEMP"',
+		'"$JSON_MODE"'
 		"messages": [
-			'"$OPENAI_MESSAGES"'
-			'"$HISTORY_MESSAGES"'
-			{
-				"role": "user",
-				"content": "'"${USER_QUERY}"'"
-			}
+			'"$OPENAI_TEMPLATE_MESSAGES $HISTORY_MESSAGES"'
 		]
-	}' "$OPENAI_URL")
+	}'
+	
+	# Prettify the JSON payload and verify it
+	JSON_PAYLOAD=$(echo "$JSON_PAYLOAD" | jq .)
+	
+	# Send request to OpenAI API
+	RESPONSE=$(curl -s -X POST -H "Authorization:Bearer $OPENAI_KEY" -H "Content-Type:application/json" -d "$JSON_PAYLOAD" "$OPENAI_URL")
 	
 	# Stop the spinner
 	kill $spinner_pid
@@ -307,6 +430,12 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 	
 	# Reset the needs to run flag
 	NEEDS_TO_RUN=false
+	
+	# Reset the query type
+	QUERY_TYPE=""
+	
+	# Reset user query
+	USER_QUERY=""
 	
 	# Extract the reply from the JSON response
 	REPLY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed "s/'//g")
@@ -317,32 +446,31 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		# We didn't get a reply
 		print_info "$NO_REPLY_TEXT"
 		echo -ne "$SHOW_CURSOR"
-		# Reset user query
-		USER_QUERY=""
 	else
 		# We got a reply
-		# Append it to history
-		HISTORY_MESSAGES+='{
-			"role": "user",
-			"content": "'"${USER_QUERY}"'"
-		},
-		{
+		# Apply it to message history
+		HISTORY_MESSAGES+=',{
 			"role": "assistant",
 			"content": "'"$(json_safe "$REPLY")"'"
-		},'
+		}'
 		
-		# Reset user query
-		USER_QUERY=""
+		# Extract information from the reply
+		INFO=$(echo "$REPLY" | jq -e -r '.info' 2>/dev/null)
 		
 		# Extract command from the reply
 		CMD=$(echo "$REPLY" | jq -e -r '.cmd' 2>/dev/null)
 		if [ $? -ne 0 ] || [ -z "$CMD" ]; then
-			# No command, show reply
-			print_info "$REPLY"
+			# Not a command
+			if [ -z "$INFO" ]; then
+				# No info
+				print_info "$REPLY"
+			else
+				# Print info
+				print_info "$INFO"
+			fi
 			echo -ne "$SHOW_CURSOR"
 		else
-			# Extract information from response
-			INFO=$(echo "$REPLY" | jq -r '.info')
+			# Make sure some sort of information exists
 			if [ -z "$INFO" ]; then
 				INFO="warning: no information"
 			fi
