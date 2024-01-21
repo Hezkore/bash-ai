@@ -93,7 +93,7 @@ curl -sS https://raw.githubusercontent.com/hezkore/bash-ai/main/install.sh | bas
 
 On the first run, a configuration file named `bai.cfg` will be created in your `~/.config` directory.\
 
-> > [!IMPORTANT]
+> [!IMPORTANT]
 > Always remove `bai.cfg` before updating Bash AI to avoid compatibility issues.
 
 You must provide a [OpenAI API key](https://platform.openai.com/api-keys) in the `key=` field of this file. The [OpenAI API key](https://platform.openai.com/api-keys) can be obtained from your [OpenAI account](https://platform.openai.com/api-keys).
