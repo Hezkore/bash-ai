@@ -174,24 +174,27 @@ run_cmd() {
 		output=$(cat "$tmpfile")
 		LAST_ERROR="${output#*"$0": line *: }"
 		echo "$LAST_ERROR"
-		print_error "[error]"
 		rm "$tmpfile"
 		
 		# Ask if we should examine the error
-		echo -n "${PRE_TEXT}examine error? [y/N]: "
-		echo -ne "$SHOW_CURSOR"
-		read -n 1 -r -s answer
-		
-		# Did the user want to examine the error?
-		if [ "$answer" == "Y" ] || [ "$answer" == "y" ]; then
-			echo "yes";echo
-			USER_QUERY="You executed \"$1\". Which returned error \"$LAST_ERROR\"."
-			QUERY_TYPE="error"
-			NEEDS_TO_RUN=true
+		if [ ${#LAST_ERROR} -gt 1 ]; then
+			print_error "[error]"
+			echo -n "${PRE_TEXT}examine error? [y/N]: "
+			echo -ne "$SHOW_CURSOR"
+			read -n 1 -r -s answer
+			
+			# Did the user want to examine the error?
+			if [ "$answer" == "Y" ] || [ "$answer" == "y" ]; then
+				echo "yes";echo
+				USER_QUERY="You executed \"$1\". Which returned error \"$LAST_ERROR\"."
+				QUERY_TYPE="error"
+				NEEDS_TO_RUN=true
+			else
+				echo "no";echo
+			fi
 		else
-			echo "no";echo
+			print_cancel "[cancel]"
 		fi
-		
 		return 1
 	fi
 }
