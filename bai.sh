@@ -5,8 +5,8 @@
 # https://github.com/Hezkore/bash-ai
 
 # Determine the user's environment
-USER_INFO=$(uname -a)
-DISTRO_INFO=$(cat /etc/os-release | grep -oP '(?<=^PRETTY_NAME=").+(?="$)')
+UNIX_NAME=$(uname -srp)
+DISTRO_INFO=$(grep -oP '(?<=^PRETTY_NAME=").+(?="$)' /etc/os-release)
 
 # Constants
 VERSION="1.0.1"
@@ -23,10 +23,10 @@ RESET_COLOR="\e[0m"
 CLEAR_LINE="\033[2K\r"
 HIDE_CURSOR="\e[?25l"
 SHOW_CURSOR="\e[?25h"
-DEFAULT_EXEC_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' must contain the simplest Bash command for the query. 'info' must inform what 'cmd' does."
-DEFAULT_QUESTION_QUERY="Return nothing but a JSON object containing a 'info' field. 'info' must provide a terminal-related answer to the query."
+DEFAULT_EXEC_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' must always contain the simplest Bash command for the query. 'info' must always contain information about what 'cmd' will do."
+DEFAULT_QUESTION_QUERY="Return nothing but a JSON object containing a 'info' field. 'info' must always contain a terminal-related answer to the query."
 DEFAULT_ERROR_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' is optional. 'cmd' is the simplest Bash command to fix, solve or repair the error in the query. 'info' must explain what the error in the query means, why it happened, and why 'cmd' might fix it."
-GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. Always provide single-line, step-by-step instructions. User is always in the terminal. Query refers to distro $DISTRO_INFO and $USER_INFO. Use only POSIX-compliant commands. Username is $USER with home $HOME."
+GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. All text must always be single-line. User is always in the terminal. Do not mention terminal. Use only POSIX-compliant commands. The query refers to $UNIX_NAME and distro $DISTRO_INFO. Username is $USER with home $HOME. PATH is $PATH"
 HISTORY_MESSAGES=""
 
 # Configuration file path
@@ -89,6 +89,7 @@ OPENAI_ERROR_QUERY=$(echo "${config[@]}" | grep -oP '(?<=^error_query=).+')
 
 # Extract maximum token count from configuration
 OPENAI_TOKENS=$(echo "${config[@]}" | grep -oP '(?<=^tokens=).+')
+GLOBAL_QUERY+=" Maximum token count is $OPENAI_TOKENS."
 
 # Test if high contrast mode is set in configuration
 HI_CONTRAST=$(echo "${config[@]}" | grep -oP '(?<=^hi_contrast=).+')
@@ -259,7 +260,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"info\": \"Use ls -a to list all files, including hidden ones, in the current directory.\" }"
+			"content": "{ \"info\": \"Use the \\\"ls\\\" command to with the \\\"-a\\\" flag to list all files, including hidden ones, in the current directory.\" }"
 		},
 		{
 			"role": "user",
@@ -267,7 +268,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"info\": \"Use ls -aR to list all files recursively, including hidden ones, in the current directory.\" }"
+			"content": "{ \"info\": \"Use the \\\"ls\\\" command to with the \\\"-aR\\\" flag to list all files recursively, including hidden ones, in the current directory.\" }"
 		},
 		{
 			"role": "user",
@@ -275,7 +276,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"info\": \"Type echo \\\"hello world\\\" and press Enter to print \\\"hello world\\\".\" }"
+			"content": "{ \"info\": \"Use the \\\"echo\\\" command to print to the terminal and \\\"echo \\\"hello world\\\"\\\" to print your specified text.\" }"
 		},
 		{
 			"role": "user",
@@ -331,14 +332,6 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "user",
-			"content": "recursively list all the files in \\\"My Downloads\\\""
-		},
-		{
-			"role": "assistant",
-			"content": "{ \"cmd\": \"ls -aR \\\"My Downloads\\\"\", \"info\": \"list all files in \\\"My Downloads\\\" recursively, including hidden ones\" }"
-		},
-		{
-			"role": "user",
 			"content": "start avidemux"
 		},
 		{
@@ -368,6 +361,14 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		{
 			"role": "assistant",
 			"content": "{ \"cmd\": \"cd \\\"hello world\\\"\", \"info\": \"move into the \\\"hello world\\\" folder\" }"
+		},
+		{
+			"role": "user",
+			"content": "add /some/path to PATH"
+		},
+		{
+			"role": "assistant",
+			"content": "{ \"cmd\": \"export PATH=/some/path:PATH\", \"info\": \"the path  \\\"/some/path\\\" is already in your PATH, adding it again is not nessecary\" }"
 		}'
 	fi
 	
@@ -407,7 +408,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 	# Apply the user query to the message history
 	HISTORY_MESSAGES+=',{
 		"role": "user",
-		"content": "'"${USER_QUERY}"'. Entire return must be shorter than '"${OPENAI_TOKENS}"' tokens."
+		"content": "'"${USER_QUERY}"'."
 	}'
 	
 	# Construct the JSON payload
