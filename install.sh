@@ -14,10 +14,11 @@ TMP_FILE=$(mktemp)
 echo
 echo "Downloading Bash AI..."
 curl -q --fail --location --progress-bar --output "$TMP_FILE" "$SCRIPT_URL"
+ret=$?
 echo
 
 # Check if curl succeeded
-if [ $? -ne 0 ]; then # curl failed
+if [ $ret -ne 0 ]; then
 	echo "Failed to download $REPO_SCRIPT from $SCRIPT_URL"
 	exit 1
 fi
