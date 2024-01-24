@@ -23,10 +23,10 @@ RESET_COLOR="\e[0m"
 CLEAR_LINE="\033[2K\r"
 HIDE_CURSOR="\e[?25l"
 SHOW_CURSOR="\e[?25h"
-DEFAULT_EXEC_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' must always contain the simplest Bash command for the query. 'info' must always contain information about what 'cmd' will do."
-DEFAULT_QUESTION_QUERY="Return nothing but a JSON object containing a 'info' field. 'info' must always contain a terminal-related answer to the query."
+DEFAULT_EXEC_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' must always include a suggestion for the simplest Bash command for the query. 'info' must always include details about the actions 'cmd' will perform and the purpose of all command flags."
+DEFAULT_QUESTION_QUERY="Return nothing but a JSON object containing a 'info' field. 'info' must always include a terminal-related answer to the query."
 DEFAULT_ERROR_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' is optional. 'cmd' is the simplest Bash command to fix, solve or repair the error in the query. 'info' must explain what the error in the query means, why it happened, and why 'cmd' might fix it."
-GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. All text must always be single-line. User is always in the terminal. Do not mention terminal. Use only POSIX-compliant commands. The query refers to $UNIX_NAME and distro $DISTRO_INFO. Username is $USER with home $HOME. PATH is $PATH"
+GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. You are a terminal assistant. We are always in the terminal. Your replies must always be single-line. You may only use POSIX-compliant commands. The query refers to \\\"$UNIX_NAME\\\" and distro \\\"$DISTRO_INFO\\\". The users username is \\\"$USER\\\" with home \\\"$HOME\\\". The users PATH environment variable is \\\"$PATH\\\"."
 HISTORY_MESSAGES=""
 
 # Configuration file path
@@ -46,6 +46,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
 		echo "expose_current_dir=true"
 		echo "expose_dir_content=true"
 		echo "max_dir_content=50"
+		echo "max_history=10"
 		echo "api=https://api.openai.com/v1/chat/completions"
 		echo "model=gpt-3.5-turbo"
 		echo "json_mode=false"
@@ -89,7 +90,7 @@ OPENAI_ERROR_QUERY=$(echo "${config[@]}" | grep -oP '(?<=^error_query=).+')
 
 # Extract maximum token count from configuration
 OPENAI_TOKENS=$(echo "${config[@]}" | grep -oP '(?<=^tokens=).+')
-GLOBAL_QUERY+=" Maximum token count is $OPENAI_TOKENS."
+GLOBAL_QUERY+=" All your messages must be less than $OPENAI_TOKENS tokens."
 
 # Test if high contrast mode is set in configuration
 HI_CONTRAST=$(echo "${config[@]}" | grep -oP '(?<=^hi_contrast=).+')
@@ -105,6 +106,9 @@ EXPOSE_DIR_CONTENT=$(echo "${config[@]}" | grep -oP '(?<=^expose_dir_content=).+
 
 # Extract maximum directory content count from configuration
 MAX_DIRECTORY_CONTENT=$(echo "${config[@]}" | grep -oP '(?<=^max_dir_content=).+')
+
+# Extract maximum history message count from configuration
+MAX_HISTORY_COUNT=$(echo "${config[@]}" | grep -oP '(?<=^max_history=).+')
 
 # Test if GPT JSON mode is set in configuration
 JSON_MODE=$(echo "${config[@]}" | grep -oP '(?<=^json_mode=).+')
@@ -160,7 +164,7 @@ print() {
 }
 
 json_safe() {
-	echo "$1" | perl -pe 's/\\/\\\\/g; s/"/\\"/g; s/\033/\\\\033/g; s/\n/\\n/g; s/\r/\\r/g; s/\t/\\t/g'
+	echo "$1" | perl -pe 's/\\/\\\\/g; s/"/\\"/g; s/\033/\\\\033/g; s/\n/ /g; s/\r/\\r/g; s/\t/\\t/g'
 }
 
 run_cmd() {
@@ -214,7 +218,7 @@ else
 	NEEDS_TO_RUN=true
 fi
 
-# While we're in Interactive Mode or it's the first run
+# While we're in Interactive Mode or NEED_TO_RUN
 while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 	# We require a user query
 	while [ -z "$USER_QUERY" ]; do
@@ -233,12 +237,11 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 	
 	# Make sure the query is JSON safe
 	USER_QUERY=$(json_safe "$USER_QUERY")
-	USER_QUERY="${USER_QUERY%\\n}"
 	
 	echo -ne "$HIDE_CURSOR"
 	
 	# Determine if we should use the question query or the execution query
-	if [ -z "$QUERY_TYPE" ]; then
+	if [ -z "$QUERY_TYPE" ]; then # If the query type is not set already
 		if [[ "$USER_QUERY" == *"?"* ]]; then
 			QUERY_TYPE="question"
 		else
@@ -252,7 +255,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		# QUESTION
 		OPENAI_TEMPLATE_MESSAGES='{
 			"role": "system",
-			"content": "'"${OPENAI_QUESTION_QUERY} ${GLOBAL_QUERY}"'"
+			"content": "'"${GLOBAL_QUERY} ${OPENAI_QUESTION_QUERY}"'"
 		},
 		{
 			"role": "user",
@@ -276,7 +279,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"info\": \"Use the \\\"echo\\\" command to print to the terminal and \\\"echo \\\"hello world\\\"\\\" to print your specified text.\" }"
+			"content": "{ \"info\": \"Use the \\\"echo\\\" command to print text, and \\\"echo \\\"hello world\\\"\\\" to print your specified text.\" }"
 		},
 		{
 			"role": "user",
@@ -290,7 +293,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		# ERROR
 		OPENAI_TEMPLATE_MESSAGES='{
 			"role": "system",
-			"content": "'"${OPENAI_ERROR_QUERY} ${GLOBAL_QUERY}"'"
+			"content": "'"${GLOBAL_QUERY} ${OPENAI_ERROR_QUERY}"'"
 		},
 		{
 			"role": "user",
@@ -306,7 +309,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"cmd\": \"cd \\\"wORLD helloz\\\"\", \"info\": \"The error indicates that the \\\"wORLD helloz\\\" directory does not exist. But this directory contains a \\\"hello world\\\" directory we can try instead.\" }"
+			"content": "{ \"cmd\": \"cd \\\"wORLD helloz\\\"\", \"info\": \"The error indicates that the \\\"wORLD helloz\\\" directory does not exist. However, the current directory contains a \\\"hello world\\\" directory we can try instead.\" }"
 		},
 		{
 			"role": "user",
@@ -314,13 +317,13 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"cmd\": \"cat \\\"install.sh\\\"\", \"info\": \"The cat command could not find the \\\"in .sh\\\" file in the current directory. But I found a similar file called \\\"install.sh\\\".\" }"
+			"content": "{ \"cmd\": \"cat \\\"install.sh\\\"\", \"info\": \"The cat command could not find the \\\"in .sh\\\" file in the current directory. However, the current directory contains a file called \\\"install.sh\\\".\" }"
 		}'
 	else
 		# COMMAND
 		OPENAI_TEMPLATE_MESSAGES='{
 			"role": "system",
-			"content": "'"${OPENAI_EXEC_QUERY} ${GLOBAL_QUERY}"'"
+			"content": "'"${GLOBAL_QUERY} ${OPENAI_EXEC_QUERY}"'"
 		},
 		{
 			"role": "user",
@@ -328,7 +331,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"cmd\": \"ls -a\", \"info\": \"list all files, including hidden ones, in the current directory\" }"
+			"content": "{ \"cmd\": \"ls -a\", \"info\": \"\\\"ls\\\" with the flag \\\"-a\\\" will list all files, including hidden ones, in the current directory\" }"
 		},
 		{
 			"role": "user",
@@ -336,7 +339,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"cmd\": \"avidemux\", \"info\": \"start the Avidemux video editor, if it'\''s installed on the system and available for the current user\" }"
+			"content": "{ \"cmd\": \"avidemux\", \"info\": \"start the Avidemux video editor, if it is installed on the system and available for the current user\" }"
 		},
 		{
 			"role": "user",
@@ -344,7 +347,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"cmd\": \"echo \\\"hello world\\\"\", \"info\": \"print the text \\\"hello world\\\"\" }"
+			"content": "{ \"cmd\": \"echo \\\"hello world\\\"\", \"info\": \"\\\"echo\\\" will print text, while \\\"echo \\\"hello world\\\"\\\" will print your text\" }"
 		},
 		{
 			"role": "user",
@@ -352,7 +355,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"cmd\": \"rm -r  \\\"hello world\\\"\", \"info\": \"remove the \\\"hello world\\\" folder and its contents recursively\" }"
+			"content": "{ \"cmd\": \"rm -r  \\\"hello world\\\"\", \"info\": \"\\\"rm\\\" with the \\\"-r\\\" flag will remove the \\\"hello world\\\" folder and its contents recursively\" }"
 		},
 		{
 			"role": "user",
@@ -360,15 +363,15 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"cmd\": \"cd \\\"hello world\\\"\", \"info\": \"move into the \\\"hello world\\\" folder\" }"
+			"content": "{ \"cmd\": \"cd \\\"hello world\\\"\", \"info\": \"\\\"cd\\\" will let you change directory to \\\"hello world\\\"\" }"
 		},
 		{
 			"role": "user",
-			"content": "add /some/path to PATH"
+			"content": "add /home/user/.local/bin to PATH"
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"cmd\": \"export PATH=/some/path:PATH\", \"info\": \"the path  \\\"/some/path\\\" is already in your PATH, adding it again is not nessecary\" }"
+			"content": "{ \"cmd\": \"export PATH=/home/user/.local/bin:PATH\", \"info\": \"\\\"export\\\" has the ability to add \\\"/some/path\\\" to your PATH for the current session. the specified path already exists in your PATH environment variable since before\" }"
 		}'
 	fi
 	
@@ -389,6 +392,15 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 	spinner & # Start the spinner
 	spinner_pid=$! # Save the spinner's PID
 	
+	# If we're not in Interactive Mode, we apply the history messages from baihistory.txt in the Temp dir
+	if [ "$INTERACTIVE_MODE" = false ]; then
+		# Check if the history file exists
+		if [ -f "/tmp/baihistory.txt" ]; then
+			# Read the history file
+			HISTORY_MESSAGES=$(sed 's/^\[\(.*\)\]$/,\1/' /tmp/baihistory.txt)
+		fi
+	fi
+	
 	# Directory and content exposure
 	tmp_msg=""
 	# Check if EXPOSE_CURRENT_DIR is true
@@ -408,7 +420,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 	# Apply the user query to the message history
 	HISTORY_MESSAGES+=',{
 		"role": "user",
-		"content": "'"${USER_QUERY}"'."
+		"content": "'${USER_QUERY}'"
 	}'
 	
 	# Construct the JSON payload
@@ -457,6 +469,14 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 			"role": "assistant",
 			"content": "'"$(json_safe "$REPLY")"'"
 		}'
+		
+		# Check the reason for stopping
+		FINISH_REASON=$(echo "$RESPONSE" | jq -r '.choices[0].finish_reason')
+		
+		# If the finish reason isn't "stop" then we'll have a cut off info field
+		if [ "$FINISH_REASON" != "stop" ]; then
+			REPLY+="... nevermind, seems like I've hit my token limit. \"}"
+		fi
 		
 		# Extract information from the reply
 		INFO=$(echo "$REPLY" | jq -e -r '.info' 2>/dev/null)
@@ -507,4 +527,25 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		fi
 	fi
 done
+
+# If we're not in Interactive Mode, we save the history messages to baihistory.txt in tmp
+if [ "$INTERACTIVE_MODE" = false ]; then
+	# Add a dummy message at the beginning to make HISTORY_MESSAGES a valid JSON array
+	HISTORY_MESSAGES_JSON="[null$HISTORY_MESSAGES]"
+	
+	# Get the number of messages
+	HISTORY_COUNT=$(echo "$HISTORY_MESSAGES_JSON" | jq 'length')
+	
+	# Convert MAX_HISTORY_COUNT to an integer
+	MAX_HISTORY_COUNT_INT=$((MAX_HISTORY_COUNT))
+	
+	# If the history is too long, remove the oldest messages
+	if (( HISTORY_COUNT > MAX_HISTORY_COUNT_INT )); then
+		HISTORY_MESSAGES_JSON=$(echo "$HISTORY_MESSAGES_JSON" | jq ".[-$MAX_HISTORY_COUNT_INT:]")
+	fi
+	
+	# Remove the dummy message and write the history to the file
+	echo "$HISTORY_MESSAGES_JSON" | jq '.[1:]' | jq -c . > /tmp/baihistory.txt
+fi
+
 exit 0
