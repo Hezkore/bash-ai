@@ -40,6 +40,9 @@ Bash AI offers the following features:
 - **Directory Awareness**\
 	Automatically detects and uses the current directory and content when executing commands.
 
+- **Locale Awareness**\
+	Automatically detects your system's locale and uses it to provide localized responses.
+
 ## Setup
 
 <details open>
