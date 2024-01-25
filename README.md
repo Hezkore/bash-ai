@@ -43,6 +43,9 @@ Bash AI offers the following features:
 - **Locale Awareness**\
 	Automatically detects your system's locale and uses it to provide localized responses.
 
+- **Vim Awareness**\
+	Automatically detects if you are using Vim and provides Vim-specific suggestions.
+
 ## Setup
 
 <details open>

@@ -18,12 +18,12 @@ if [ ${#DISTRO_INFO} -le 1 ]; then
 fi
 
 # Version of Bash AI
-VERSION="1.0.2"
+VERSION="1.0.3"
 
 # Global variables
 PRE_TEXT="  "  # Prefix for text output
 NO_REPLY_TEXT="¯\_(ツ)_/¯"  # Text for no reply
-TOKEN_LIMIT_TEXT="... nevermind, seems like I've hit my token limit. \""  # Text for token limit
+TOKEN_LIMIT_TEXT="... nevermind, seems like I've hit my token limit."  # Text for token limit
 INTERACTIVE_INFO="Hi! Feel free to ask me anything or give me a task. Type \"exit\" when you're done."  # Text for interactive mode intro
 PROGRESS_TEXT="Thinking..."
 PROGRESS_ANIM="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
@@ -48,18 +48,40 @@ RESET_COLOR="\e[0m"
 DEFAULT_EXEC_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' must always include a suggestion for the simplest Bash command for the query. 'info' must always include details about the actions 'cmd' will perform and the purpose of all command flags."
 DEFAULT_QUESTION_QUERY="Return nothing but a JSON object containing a 'info' field. 'info' must always include a terminal-related answer to the query."
 DEFAULT_ERROR_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' is optional. 'cmd' is the simplest Bash command to fix, solve or repair the error in the query. 'info' must explain what the error in the query means, why it happened, and why 'cmd' might fix it."
-
-# Configuration file path
-CONFIG_FILE=~/.config/bai.cfg
-
-# History file path
-HISTORY_FILE=/tmp/baihistory.txt
+DYNAMIC_SYSTEM_QUERY=""
 
 # Global query variable, this will be updated with specific user and system information
 GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. Your config file path \"$CONFIG_FILE\". Your message history path \"$HISTORY_FILE\". You are a terminal assistant. We are always in the terminal. Your replies must always be single-line. You may only use POSIX-compliant commands. The query refers to \"$UNIX_NAME\" and distro \"$DISTRO_INFO\". The users username is \"$USER\" with home \"$HOME\". The users PATH environment variable is \"$PATH\". You must always use locale \"$(locale)\"."
 
+# Configuration file path
+CONFIG_FILE=~/.config/bai.cfg
+
+# Test if we're in Vim
+if [ -n "$VIM" ]; then
+	CMD_BG_COLOR=""
+	CMD_TEXT_COLOR=""
+	INFO_TEXT_COLOR=""
+	ERROR_TEXT_COLOR=""
+	CANCEL_TEXT_COLOR=""
+	OK_TEXT_COLOR=""
+	TITLE_TEXT_COLOR=""
+	CLEAR_LINE=""
+	HIDE_CURSOR=""
+	SHOW_CURSOR=""
+	RESET_COLOR=""
+	
+	# Make sure system message reflects that we're in Vim
+	DYNAMIC_SYSTEM_QUERY="User is inside \"$VIM\". You are in the Vim terminal."
+	
+	# Use the Vim history file
+	HISTORY_FILE=/tmp/baihistory_vim.txt
+else
+	# Use the default history file
+	HISTORY_FILE=/tmp/baihistory_com.txt
+fi
+
 # Hide the cursor while we're working
-trap 'echo -ne "$SHOW_CURSOR"' EXIT
+trap 'echo -ne "$SHOW_CURSOR"' EXIT # Make sure the cursor is shown when the script exits
 echo -e "$HIDE_CURSOR"
 
 # Check for configuration file existence
@@ -235,6 +257,7 @@ DEFAULT_EXEC_QUERY=$(json_safe "$DEFAULT_EXEC_QUERY")
 DEFAULT_QUESTION_QUERY=$(json_safe "$DEFAULT_QUESTION_QUERY")
 DEFAULT_ERROR_QUERY=$(json_safe "$DEFAULT_ERROR_QUERY")
 GLOBAL_QUERY=$(json_safe "$GLOBAL_QUERY")
+DYNAMIC_SYSTEM_QUERY=$(json_safe "$DYNAMIC_SYSTEM_QUERY")
 
 # User AI query and Interactive Mode
 USER_QUERY=$*
@@ -432,20 +455,23 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		fi
 	fi
 	
+	# Prepare system message
+	sys_msg=""
 	# Directory and content exposure
-	tmp_msg=""
 	# Check if EXPOSE_CURRENT_DIR is true
 	if [ "$EXPOSE_CURRENT_DIR" = true ]; then
-		tmp_msg+="User is in directory $(json_safe "$(pwd)"). "
+		sys_msg+="User is in directory $(json_safe "$(pwd)"). "
 	fi
 	# Check if EXPOSE_DIR_CONTENT is true
 	if [ "$EXPOSE_DIR_CONTENT" = true ]; then
-		tmp_msg+="Current directory contains $(json_safe "$(ls -1F | head -n $MAX_DIRECTORY_CONTENT)")."
+		sys_msg+="Current directory contains $(json_safe "$(ls -1F | head -n $MAX_DIRECTORY_CONTENT)"). "
 	fi
-	# Apply the directory and content message to the message history
+	# Apply dynamic system query
+	sys_msg+="$DYNAMIC_SYSTEM_QUERY"
+	# Apply the system message to history
 	HISTORY_MESSAGES+=',{
 		"role": "system",
-		"content": "'"${tmp_msg}"'"
+		"content": "'"${sys_msg}"'"
 	}'
 	
 	# Apply the user query to the message history
@@ -504,9 +530,33 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		# Check the reason for stopping
 		FINISH_REASON=$(echo "$RESPONSE" | jq -r '.choices[0].finish_reason')
 		
-		# If the finish reason isn't "stop" then we'll have a cut off info field
 		if [ "$FINISH_REASON" != "stop" ]; then
-			REPLY+="$TOKEN_LIMIT_TEXT \"}"
+			if [ "$FINISH_REASON" == "length" ]; then
+				
+				# Count the number of " characters in $REPLY
+				quote_count=$(grep -o "\"" <<< "$REPLY" | wc -l)
+				
+				# Check if the count is odd
+				if (( quote_count % 2 != 0 )); then
+					# If it's odd, there's an open string, so we need to add a "
+					REPLY+="$TOKEN_LIMIT_TEXT\"}"
+				else
+					# If it's even, there's no open string, so we don't need to add a "
+					REPLY+="$TOKEN_LIMIT_TEXT}"
+				fi
+			elif [ "$FINISH_REASON" == "content_filter" ]; then
+				REPLY="Your query was rejected."
+			elif [ "$FINISH_REASON" == "function_call" ]; then
+				REPLY="An unsupported function was called."
+			else
+				# Try to get the message from error > message
+				ERR_MSG=$(echo "$RESPONSE" | jq -r '.error.message')
+				if [ "$ERR_MSG" != "null" ]; then
+					REPLY=" $ERR_MSG"
+				else
+					REPLY="An unknown error occured."
+				fi
+			fi
 		fi
 		
 		# Extract information from the reply
