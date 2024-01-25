@@ -6,43 +6,57 @@
 
 # Determine the user's environment
 UNIX_NAME=$(uname -srp)
-# Attempt tp fetch distro info from
+# Attempt to fetch distro info from lsb_release or /etc/os-release
 if [ -x "$(command -v lsb_release)" ]; then
 	DISTRO_INFO=$(lsb_release -ds | sed 's/^"//;s/"$//')
 elif [ -f "/etc/os-release" ]; then
 	DISTRO_INFO=$(grep -oP '(?<=^PRETTY_NAME=").+(?="$)' /etc/os-release)
 fi
-# If we failed to fetch distro info, we'll use mark it as unknown
+# If we failed to fetch distro info, we'll mark it as unknown
 if [ ${#DISTRO_INFO} -le 1 ]; then
 	DISTRO_INFO="Unknown"
 fi
 
-# Constants
-VERSION="1.0.1"
-PRE_TEXT="  "
-NO_REPLY_TEXT="¯\_(ツ)_/¯"
-CMD_BG_COLOR="\e[48;5;236m"
-CMD_TEXT_COLOR="\e[38;5;203m"
-INFO_TEXT_COLOR="\e[90;3m"
-ERROR_TEXT_COLOR="\e[91m"
-CANCEL_TEXT_COLOR="\e[93m"
-OK_TEXT_COLOR="\e[92m"
-TITLE_TEXT_COLOR="\e[1m"
-RESET_COLOR="\e[0m"
+# Version of Bash AI
+VERSION="1.0.2"
+
+# Global variables
+PRE_TEXT="  "  # Prefix for text output
+NO_REPLY_TEXT="¯\_(ツ)_/¯"  # Text for no reply
+TOKEN_LIMIT_TEXT="... nevermind, seems like I've hit my token limit. \""  # Text for token limit
+INTERACTIVE_INFO="Hi! Feel free to ask me anything or give me a task. Type \"exit\" when you're done."  # Text for interactive mode intro
+PROGRESS_TEXT="Thinking..."
+PROGRESS_ANIM="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+HISTORY_MESSAGES=""  # Placeholder for history messages, this will be updated later
+
+# Theme colors
+CMD_BG_COLOR="\e[48;5;236m"  # Background color for cmd suggestions
+CMD_TEXT_COLOR="\e[38;5;203m"  # Text color for cmd suggestions
+INFO_TEXT_COLOR="\e[90;3m"  # Text color for all information messages
+ERROR_TEXT_COLOR="\e[91m"  # Text color for cmd errors messages
+CANCEL_TEXT_COLOR="\e[93m"  # Text color cmd for cancellation message
+OK_TEXT_COLOR="\e[92m"  # Text color for cmd success message
+TITLE_TEXT_COLOR="\e[1m"  # Text color for the Bash AI title
+
+# Terminal control constants
 CLEAR_LINE="\033[2K\r"
 HIDE_CURSOR="\e[?25l"
 SHOW_CURSOR="\e[?25h"
+RESET_COLOR="\e[0m"
+
+# Default query constants, these are used as default values for different types of queries
 DEFAULT_EXEC_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' must always include a suggestion for the simplest Bash command for the query. 'info' must always include details about the actions 'cmd' will perform and the purpose of all command flags."
 DEFAULT_QUESTION_QUERY="Return nothing but a JSON object containing a 'info' field. 'info' must always include a terminal-related answer to the query."
 DEFAULT_ERROR_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' is optional. 'cmd' is the simplest Bash command to fix, solve or repair the error in the query. 'info' must explain what the error in the query means, why it happened, and why 'cmd' might fix it."
-GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. You are a terminal assistant. We are always in the terminal. Your replies must always be single-line. You may only use POSIX-compliant commands. The query refers to \"$UNIX_NAME\" and distro \"$DISTRO_INFO\". The users username is \"$USER\" with home \"$HOME\". The users PATH environment variable is \"$PATH\". You must always use locale \"$(locale)\"."
-HISTORY_MESSAGES=""
 
 # Configuration file path
 CONFIG_FILE=~/.config/bai.cfg
 
 # History file path
 HISTORY_FILE=/tmp/baihistory.txt
+
+# Global query variable, this will be updated with specific user and system information
+GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. Your config file path \"$CONFIG_FILE\". Your message history path \"$HISTORY_FILE\". You are a terminal assistant. We are always in the terminal. Your replies must always be single-line. You may only use POSIX-compliant commands. The query refers to \"$UNIX_NAME\" and distro \"$DISTRO_INFO\". The users username is \"$USER\" with home \"$HOME\". The users PATH environment variable is \"$PATH\". You must always use locale \"$(locale)\"."
 
 # Hide the cursor while we're working
 trap 'echo -ne "$SHOW_CURSOR"' EXIT
@@ -230,7 +244,7 @@ if [ -z "$USER_QUERY" ]; then
 	INTERACTIVE_MODE=true
 	print "🤖 ${TITLE_TEXT_COLOR}Bash AI v${VERSION}${RESET_COLOR}"
 	echo
-	print_info "Hi! What can I help you with?"
+	print_info "$INTERACTIVE_INFO"
 else
 	INTERACTIVE_MODE=false
 	NEEDS_TO_RUN=true
@@ -301,7 +315,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "user",
-			"content": "how do autocomplete commands?"
+			"content": "how do I autocomplete commands?"
 		},
 		{
 			"role": "assistant",
@@ -389,21 +403,20 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		},
 		{
 			"role": "assistant",
-			"content": "{ \"cmd\": \"export PATH=/home/user/.local/bin:PATH\", \"info\": \"\\\"export\\\" has the ability to add \\\"/some/path\\\" to your PATH for the current session. the specified path already exists in your PATH environment variable since before\" }"
+			"content": "{ \"cmd\": \"export PATH=/home/user/.local/bin:PATH\", \"info\": \"\\\"export\\\" has the ability to add \\\"/some/path\\\" to your PATH environment variable for the current session. the specified path already exists in your PATH environment variable since before\" }"
 		}'
 	fi
 	
 	# Notify the user about our progress
-	echo -ne "${PRE_TEXT}  Thinking..."
+	echo -ne "${PRE_TEXT}  $PROGRESS_TEXT"
 	
 	# Start the spinner in the background
 	spinner() {
-		local chars="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 		while :; do
-			for (( i=0; i<${#chars}; i++ )); do
+			for (( i=0; i<${#PROGRESS_ANIM}; i++ )); do
 				sleep 0.1
 				# Print a carriage return (\r) and then the spinner character
-				echo -ne "\r${PRE_TEXT}${chars:$i:1}"
+				echo -ne "\r${PRE_TEXT}${PROGRESS_ANIM:$i:1}"
 			done
 		done
 	}
@@ -493,7 +506,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 		
 		# If the finish reason isn't "stop" then we'll have a cut off info field
 		if [ "$FINISH_REASON" != "stop" ]; then
-			REPLY+="... nevermind, seems like I've hit my token limit. \"}"
+			REPLY+="$TOKEN_LIMIT_TEXT \"}"
 		fi
 		
 		# Extract information from the reply
