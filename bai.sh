@@ -35,11 +35,14 @@ SHOW_CURSOR="\e[?25h"
 DEFAULT_EXEC_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' must always include a suggestion for the simplest Bash command for the query. 'info' must always include details about the actions 'cmd' will perform and the purpose of all command flags."
 DEFAULT_QUESTION_QUERY="Return nothing but a JSON object containing a 'info' field. 'info' must always include a terminal-related answer to the query."
 DEFAULT_ERROR_QUERY="Return nothing but a JSON object containing 'cmd' and 'info' fields. 'cmd' is optional. 'cmd' is the simplest Bash command to fix, solve or repair the error in the query. 'info' must explain what the error in the query means, why it happened, and why 'cmd' might fix it."
-GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. You are a terminal assistant. We are always in the terminal. Your replies must always be single-line. You may only use POSIX-compliant commands. The query refers to \\\"$UNIX_NAME\\\" and distro \\\"$DISTRO_INFO\\\". The users username is \\\"$USER\\\" with home \\\"$HOME\\\". The users PATH environment variable is \\\"$PATH\\\"."
+GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. You are a terminal assistant. We are always in the terminal. Your replies must always be single-line. You may only use POSIX-compliant commands. The query refers to \"$UNIX_NAME\" and distro \"$DISTRO_INFO\". The users username is \"$USER\" with home \"$HOME\". The users PATH environment variable is \"$PATH\". You must always use locale \"$(locale)\"."
 HISTORY_MESSAGES=""
 
 # Configuration file path
 CONFIG_FILE=~/.config/bai.cfg
+
+# History file path
+HISTORY_FILE=/tmp/baihistory.txt
 
 # Hide the cursor while we're working
 trap 'echo -ne "$SHOW_CURSOR"' EXIT
@@ -99,7 +102,7 @@ OPENAI_ERROR_QUERY=$(echo "${config[@]}" | grep -oP '(?<=^error_query=).+')
 
 # Extract maximum token count from configuration
 OPENAI_TOKENS=$(echo "${config[@]}" | grep -oP '(?<=^tokens=).+')
-GLOBAL_QUERY+=" All your messages must be less than $OPENAI_TOKENS tokens."
+GLOBAL_QUERY+=" All your messages must be less than \"$OPENAI_TOKENS\" tokens."
 
 # Test if high contrast mode is set in configuration
 HI_CONTRAST=$(echo "${config[@]}" | grep -oP '(?<=^hi_contrast=).+')
@@ -212,6 +215,12 @@ run_cmd() {
 		return 1
 	fi
 }
+
+# Make sure all queries are JSON safe
+DEFAULT_EXEC_QUERY=$(json_safe "$DEFAULT_EXEC_QUERY")
+DEFAULT_QUESTION_QUERY=$(json_safe "$DEFAULT_QUESTION_QUERY")
+DEFAULT_ERROR_QUERY=$(json_safe "$DEFAULT_ERROR_QUERY")
+GLOBAL_QUERY=$(json_safe "$GLOBAL_QUERY")
 
 # User AI query and Interactive Mode
 USER_QUERY=$*
@@ -404,9 +413,9 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 	# If we're not in Interactive Mode, we apply the history messages from baihistory.txt in the Temp dir
 	if [ "$INTERACTIVE_MODE" = false ]; then
 		# Check if the history file exists
-		if [ -f "/tmp/baihistory.txt" ]; then
+		if [ -f "$HISTORY_FILE" ]; then
 			# Read the history file
-			HISTORY_MESSAGES=$(sed 's/^\[\(.*\)\]$/,\1/' /tmp/baihistory.txt)
+			HISTORY_MESSAGES=$(sed 's/^\[\(.*\)\]$/,\1/' $HISTORY_FILE)
 		fi
 	fi
 	
@@ -446,6 +455,8 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 	# Prettify the JSON payload and verify it
 	JSON_PAYLOAD=$(echo "$JSON_PAYLOAD" | jq .)
 	
+	echo JSON_PAYLOAD: "$JSON_PAYLOAD"
+	
 	# Send request to OpenAI API
 	RESPONSE=$(curl -s -X POST -H "Authorization:Bearer $OPENAI_KEY" -H "Content-Type:application/json" -d "$JSON_PAYLOAD" "$OPENAI_URL")
 	
@@ -463,7 +474,7 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 	USER_QUERY=""
 	
 	# Extract the reply from the JSON response
-	REPLY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed "s/'//g")
+	REPLY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
 	
 	# Process the reply
 	echo -ne "$CLEAR_LINE\r"
@@ -554,7 +565,7 @@ if [ "$INTERACTIVE_MODE" = false ]; then
 	fi
 	
 	# Remove the dummy message and write the history to the file
-	echo "$HISTORY_MESSAGES_JSON" | jq '.[1:]' | jq -c . > /tmp/baihistory.txt
+	echo "$HISTORY_MESSAGES_JSON" | jq '.[1:]' | jq -c . > $HISTORY_FILE
 fi
 
 exit 0
