@@ -36,7 +36,7 @@ Bash AI offers the following features:
 
 - **Persistent Memory**\
 	Remembers your previous requests and uses them to improve future suggestions.
-	
+
 - **Directory Awareness**\
 	Automatically detects and uses the current directory and content when executing commands.
 

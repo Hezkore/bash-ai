@@ -6,7 +6,16 @@
 
 # Determine the user's environment
 UNIX_NAME=$(uname -srp)
-DISTRO_INFO=$(grep -oP '(?<=^PRETTY_NAME=").+(?="$)' /etc/os-release)
+# Attempt tp fetch distro info from
+if [ -x "$(command -v lsb_release)" ]; then
+	DISTRO_INFO=$(lsb_release -ds | sed 's/^"//;s/"$//')
+elif [ -f "/etc/os-release" ]; then
+	DISTRO_INFO=$(grep -oP '(?<=^PRETTY_NAME=").+(?="$)' /etc/os-release)
+fi
+# If we failed to fetch distro info, we'll use mark it as unknown
+if [ ${#DISTRO_INFO} -le 1 ]; then
+	DISTRO_INFO="Unknown"
+fi
 
 # Constants
 VERSION="1.0.1"
