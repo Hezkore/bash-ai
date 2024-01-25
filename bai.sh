@@ -455,8 +455,6 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ]; do
 	# Prettify the JSON payload and verify it
 	JSON_PAYLOAD=$(echo "$JSON_PAYLOAD" | jq .)
 	
-	echo JSON_PAYLOAD: "$JSON_PAYLOAD"
-	
 	# Send request to OpenAI API
 	RESPONSE=$(curl -s -X POST -H "Authorization:Bearer $OPENAI_KEY" -H "Content-Type:application/json" -d "$JSON_PAYLOAD" "$OPENAI_URL")
 	
