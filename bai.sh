@@ -587,14 +587,6 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ] || [ "$AWAIT_
 		fi
 	fi
 	
-	# Apply the user to the message history
-	if [ ${#USER_QUERY} -gt 0 ]; then
-		HISTORY_MESSAGES+=',{
-			"role": "user",
-			"content": "'${USER_QUERY}'"
-		}'
-	fi
-	
 	# Prepare system message
 	if [ "$SKIP_SYSTEM_MSG" != true ]; then
 		sys_msg=""
@@ -611,6 +603,14 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ] || [ "$AWAIT_
 			"content": "'"${sys_msg}"'"
 		}'
 		HISTORY_MESSAGES+="$LAST_HISTORY_MESSAGE"
+	fi
+	
+	# Apply the user to the message history
+	if [ ${#USER_QUERY} -gt 0 ]; then
+		HISTORY_MESSAGES+=',{
+			"role": "user",
+			"content": "'${USER_QUERY}'"
+		}'
 	fi
 	
 	# Construct the JSON payload if we don't already have one
