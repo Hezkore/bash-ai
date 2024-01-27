@@ -1,6 +1,6 @@
 # Bash AI
 
-Bash AI _(bai)_ is an advanced Bash shell script functioning as an AI-powered terminal assistant, inspired by [Your AI _(yai)_](https://github.com/ekkinox/yai).\
+Bash AI _(bai)_ is an advanced Bash shell script functioning as an AI-powered terminal assistant, inspired by [Your AI](https://github.com/ekkinox/yai).\
 Leveraging the newest OpenAI's capabilities, it allows you to ask questions and perform terminal-based tasks using natural language. It provides answers and command suggestions based on your input and allows you to execute or edit the suggested commands if desired.
 
 Bash AI is not only powerful out of the box, but also expandable!\
