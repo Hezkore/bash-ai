@@ -133,12 +133,13 @@ bai what is the current time?
 
 ## Plugins and tools
 
-Plugins are OpenAI tools that expand Bash AI's functionality.\
-All tools should be placed in the `~/.bai_tools` directory.\
+Plugins are OpenAI tools that expand Bash AI's functionality, but they are not included in the default Bash AI setup.\
+All tools should be placed in your `~/.bai_tools` directory.\
 You can see which tools are currently installed by running `bai`, and Bash AI will list them for you.
 
 Tools are nothing more than a shell script with a `init` and `execute` function.\
-You can find examples and available tools in the `tools` folder. Feel free to move them to your `~/.bai_tools` directory to enable them.
+You can find examples and available tools in the [tools folder](https://github.com/Hezkore/bash-ai/tree/main/tools).\
+Feel free to move them to your `~/.bai_tools` directory to enable them!
 
 ## Known Issues
 
