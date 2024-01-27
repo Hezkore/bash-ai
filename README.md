@@ -9,6 +9,9 @@ Bash AI offers the following features:
 
 - **100% Shell Script**\
 	No need to install anything. Just run it!
+	
+- **Plugins!**\
+	Extend Bash AI's functionality by adding plugins known as "tools".
 
 - **Natural Language Interface**\
 	Communicate with the terminal using everyday language.
@@ -38,7 +41,7 @@ Bash AI offers the following features:
 	Remembers your previous requests and uses them to improve future suggestions.
 
 - **Directory Awareness**\
-	Automatically detects and uses the current directory and content when executing commands.
+	Automatically detects and uses the current directory when executing commands.
 
 - **Locale Awareness**\
 	Automatically detects your system's locale and uses it to provide localized responses.
@@ -48,16 +51,16 @@ Bash AI offers the following features:
 
 ## Setup
 
-<details open>
-<summary><b>Quick Start</b></summary>
-
 * To setup Bash AI quickly, you can run the following command:
 
 ```bash
 curl -sS https://raw.githubusercontent.com/hezkore/bash-ai/main/install.sh | bash
 ```
 
-</details>
+> [!WARNING]
+> Never run unknown scripts without reviewing them for safety. Read the install script [here](https://raw.githubusercontent.com/hezkore/bash-ai/main/install.sh).
+
+* Run `bai` to start Bash AI.
 
 <details>
 <summary><b>Manual Setup</b></summary>
@@ -127,6 +130,15 @@ You can also ask questions  by ending your request with a question mark:
 ```
 bai what is the current time?
 ```
+
+## Plugins and tools
+
+Plugins are OpenAI tools that expand Bash AI's functionality.\
+All tools should be placed in the `~/.bai_tools` directory.\
+You can see which tools are currently installed by running `bai`, and Bash AI will list them for you.
+
+Tools are nothing more than a shell script with a `init` and `execute` function.\
+You can find examples and available tools in the `tools` folder. Feel free to move them to your `~/.bai_tools` directory to enable them.
 
 ## Known Issues
 
