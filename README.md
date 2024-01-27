@@ -54,7 +54,7 @@ Bash AI offers the following features:
 
 ## Setup
 
-* To setup Bash AI quickly, you can run the following command:
+1. To setup Bash AI quickly, you can run the following command:
 
 ```bash
 curl -sS https://raw.githubusercontent.com/hezkore/bash-ai/main/install.sh | bash
@@ -63,7 +63,7 @@ curl -sS https://raw.githubusercontent.com/hezkore/bash-ai/main/install.sh | bas
 > [!WARNING]
 > Never run unknown scripts without reviewing them for safety. Read the install script [here](https://raw.githubusercontent.com/hezkore/bash-ai/main/install.sh).
 
-* Run `bai` to start Bash AI.
+2. Run `bai` to start Bash AI.
 
 <details>
 <summary><b>Manual Setup</b></summary>
