@@ -8,17 +8,22 @@ init() {
 		"type": "function",
 		"function": {
 			"name": "find-wildcard",
-			"description": "Search for any file or directory. Please always use -iname and never -name.",
+			"description": "Use this to find any file or directory.",
 			"parameters": {
 				"type": "object",
 				"properties": {
-					"args": {
+					"path": {
 						"type": "string",
-						"description": "The arguments to pass to the find command"
+						"description": "The path to search recursivly from"
+					},
+					"name": {
+						"type": "string",
+						"description": "The iname to search for"
 					}
 				},
 				"required": [
-					"args"
+					"path",
+					"name"
 				]
 			}
 		}
@@ -26,13 +31,16 @@ init() {
 }
 
 execute() {
-	local args
-	args=$(echo "$1" | jq -r '.args')
-	args=$(echo "$args" | sed -E 's/(-i?name) "([^"]*)"/\1 "*\2*"/g; s/(-i?name) ([^ ]*)/\1 "*\2*"/g')
-	output=$(eval find $args 2>&1 | { grep -v "Permission denied" || true; })
-	if [ -z "$output" ]; then
-		echo "Not found"
-	else
+	local path
+	local name
+	path=$(echo "$1" | jq -r '.path')
+	name=$(echo "$1" | jq -r '.name')
+	name="*$name*"
+    output=$(eval "find $path -iname '$name'" 2>/dev/null)
+    if [ -n "$output" ]; then
+		output=$(echo "$output" | awk '{printf "%s\\n", $0}')
 		echo "$output"
-	fi
+    else
+        echo "Not found"
+    fi
 }

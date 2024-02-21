@@ -30,7 +30,7 @@ execute() {
 	path=$(echo "$1" | jq -r '.path')
 	output=$(ls -1F "$path" 2>&1)
 	if [ $? -eq 0 ]; then
-		echo "$output" | awk '{print "\"" $0 "\""}'
+		echo "$output" | awk '{printf "%s\\n", $0}'
 	else
 		echo "$output"
 	fi

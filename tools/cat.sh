@@ -8,7 +8,7 @@ init() {
 		"type": "function",
 		"function": {
 			"name": "cat",
-			"description": "Get content of any file. Do not use on binary files.",
+			"description": "Use this to get the content of any file. Do not use on binary files.",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -28,9 +28,9 @@ init() {
 execute() {
 	local path
 	path=$(echo "$1" | jq -r '.path')
-	output=$(cat "$path" 2>&1)
+	output=$(awk '{printf "LINE %d: %s\\\\n", NR, $0}' "$path" 2>&1)
 	if [ $? -eq 0 ]; then
-		echo "\"$output\""
+		echo -e "$output"
 	else
 		echo "$output"
 	fi

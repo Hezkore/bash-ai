@@ -28,7 +28,7 @@ if [ ${#DISTRO_INFO} -le 1 ]; then
 fi
 
 # Version of Bash AI
-VERSION="1.0.4"
+VERSION="1.0.5"
 
 # Global variables
 PRE_TEXT="  "  # Prefix for text output
@@ -54,20 +54,20 @@ SHOW_CURSOR="\e[?25h"
 RESET_COLOR="\e[0m"
 
 # Default query constants, these are used as default values for different types of queries
-DEFAULT_EXEC_QUERY="Return only a JSON object containing 'cmd' and 'info' fields. 'cmd' must always include a suggestion for the simplest Bash command for the query. 'info' must always be a single-line string and include details about the actions 'cmd' will perform and the purpose of all command flags."
-DEFAULT_QUESTION_QUERY="Return only a JSON object containing a 'info' field. 'info' must always be a single-line string and include a terminal-related answer to the query."
-DEFAULT_ERROR_QUERY="Return only a JSON object containing 'cmd' and 'info' fields. 'cmd' is optional. 'cmd' is the simplest Bash command to fix, solve or repair the error in the query. 'info' must always be a single-line string and explain what the error in the query means, why it happened, and why 'cmd' might fix it. Use your tools to find out why the error occured and offer alternatives."
+DEFAULT_EXEC_QUERY="Return only a single compact JSON object containing 'cmd' and 'info' fields. 'cmd' must always contain one or multiple commands to perform the task specified in the user query. 'info' must always contain a single-line string detailing the actions 'cmd' will perform and the purpose of all command flags. 'cmd' may output a shell script to perform complex tasks. 'cmd' may be omittied as a last resort if no command can be suggested."
+DEFAULT_QUESTION_QUERY="Return only a single compact JSON object containing a 'info' field. 'info' must always contain a single-line string terminal-related answer to the user query."
+DEFAULT_ERROR_QUERY="Return only a single compact JSON object containing 'cmd' and 'info' fields. 'cmd' is optional. 'cmd' must always contain a suggestion on how to fix, solve or repair the error in the user query. 'info' must always be a single-line string explaining what the error in the user query means, why it happened, and why 'cmd' might fix it. Use your tools to find out why the error occured and offer alternatives."
 DYNAMIC_SYSTEM_QUERY="" # After most user queries, we'll add some dynamic system information to the query
 
 # Global query variable, this will be updated with specific user and system information
-GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. You return nothing but a JSON object. You are a terminal assistant. We are always in the terminal. The query refers to \"$UNIX_NAME\" and distro \"$DISTRO_INFO\". The users username is \"$USER\" with home \"$HOME\". You must always use LANG $LANG and LC_TIME $LC_TIME."
+GLOBAL_QUERY="You are Bash AI (bai) v${VERSION}. You are an advanced Bash shell script. You are located at \"$0\". You do not have feelings or emotions, do not convey them. Please give precise curt answers. Please do not include any sign off phrases or platitudes, only respond precisely to the user. Bash AI is made by Hezkore. You execute the tasks the user asks from you by utilizing the terminal and shell commands. No task is too big. Always assume the query is terminal and shell related. You support user plugins called \"tools\" that extends your capabilities, more info and plugins can be found on the Bash AI homepage. The Bash AI homepage is \"https://github.com/hezkore/bash-ai\". You always respond with a single JSON object containing 'cmd' and 'info' fields. We are always in the terminal. The user is using \"$UNIX_NAME\" and specifically distribution \"$DISTRO_INFO\". The users username is \"$USER\" with home \"$HOME\". You must always use LANG $LANG and LC_TIME $LC_TIME."
 
 # Configuration file path
 CONFIG_FILE=~/.config/bai.cfg
 #GLOBAL_QUERY+=" Your configuration file path \"$CONFIG_FILE\"."
 
 # Test if we're in Vim
-if [ -n "$VIM" ]; then
+if [ -n "$VIMRUNTIME" ]; then
 	CMD_BG_COLOR=""
 	CMD_TEXT_COLOR=""
 	INFO_TEXT_COLOR=""
@@ -114,30 +114,43 @@ do
 		# For each file, run it in a subshell and call its `init` function
 		init_output=$(source "$tool"; init 2>/dev/null)
 		
-		# Check the exit status of the last command.
+		# Check the exit status of the last command
 		if [ $? -ne 0 ]; then
 			echo "WARNING: $tool does not contain an init function."
 		else
-			# Test if the output is a valid JSON and pretty-print it.
+			# Test if the output is a valid JSON and pretty-print it
 			pretty_json=$(echo "$init_output" | jq . 2>/dev/null)
 			
 			if [ $? -ne 0 ]; then
 				echo "ERROR: $tool init function has JSON syntax errors."
 				exit 1
 			else
-				# Extract the type from the JSON.
+				# Extract the type from the JSON
 				type=$(echo "$pretty_json" | jq -r '.type')
 				
-				# If the type is "function", extract the function name and store it in the array.
+				# If the type is "function", extract the function name and store it in the array
 				if [ "$type" = "function" ]; then
 					# Extract the function name from the JSON.
 					function_name=$(echo "$pretty_json" | jq -r '.function.name')
 					
-					# Check if the function name already exists in the map.
+					# Check if the function name already exists in the map
 					if [ -n "${TOOL_MAP[$function_name]}" ]; then
 						echo "ERROR: $tool tried to claim function name \"$function_name\" which is already claimed"
 						exit 1
 					else
+						# It's a valid function name, append the tool_reason
+						# These go into .function.parameters.properties as a tool_reason JSON object, which has type and description
+						# And also add .function.parameters.required tool_reason
+						
+						# Define the tool_reason JSON object
+						tool_reason='{"tool_reason": {"type": "string", "description": "Reason why this tool must be used. e.g. \"This will help me ensure that the command runs without errors, by allowing me to verify that the system is in order. If I do not check the system I cannot find an alternative if there are errors.\""}}'
+						
+						# Add the tool_reason object to the parameters object in the pretty_json JSON
+						pretty_json=$(echo "$pretty_json" | jq --argjson new_param "$tool_reason" '.function.parameters.properties += $new_param')
+						
+						# Add tool_reason to the required array
+						pretty_json=$(echo "$pretty_json" | jq --arg new_param "tool_reason" '.function.parameters.required += [$new_param]')
+						
 						TOOL_MAP["$function_name"]="$tool"
 						OPENAI_TOOLS+="$pretty_json,"
 					fi
@@ -243,6 +256,10 @@ fi
 
 # Helper functions
 print_info() {
+	# Return if there's no text
+	if [ ${#1} -le 0 ]; then
+		return
+	fi
 	echo -ne "${PRE_TEXT}${INFO_TEXT_COLOR}"
 	echo -n "$1"
 	echo -e "${RESET_COLOR}"
@@ -250,21 +267,37 @@ print_info() {
 }
 
 print_ok() {
+	# Return if there's no text
+	if [ ${#1} -le 0 ]; then
+		return
+	fi
 	echo -e "${OK_TEXT_COLOR}$1${RESET_COLOR}"
 	echo
 }
 
 print_error() {
+	# Return if there's no text
+	if [ ${#1} -le 0 ]; then
+		return
+	fi
 	echo -e "${ERROR_TEXT_COLOR}$1${RESET_COLOR}"
 	echo
 }
 
 print_cancel() {
+	# Return if there's no text
+	if [ ${#1} -le 0 ]; then
+		return
+	fi
 	echo -e "${CANCEL_TEXT_COLOR}$1${RESET_COLOR}"
 	echo
 }
 
 print_cmd() {
+	# Return if there's no text
+	if [ ${#1} -le 0 ]; then
+		return
+	fi
 	echo -ne "${PRE_TEXT}${CMD_BG_COLOR}${CMD_TEXT_COLOR}"
 	echo -n " $1 "
 	echo -e "${RESET_COLOR}"
@@ -276,9 +309,7 @@ print() {
 }
 
 json_safe() {
-	# FIX:
-	# This is a bad way of doing this
-	# It also misses some unsafe characters
+	# FIX this is a bad way of doing this, and it misses many unsafe characters
 	echo "$1" | perl -pe 's/\\/\\\\/g; s/"/\\"/g; s/\033/\\\\033/g; s/\n/ /g; s/\r/\\r/g; s/\t/\\t/g'
 }
 
@@ -333,8 +364,10 @@ run_tool() {
 	else
 		TOOL_SCRIPT="${TOOL_MAP[$TOOL_NAME]}"
 		
-		TOOL_ARGS_READABLE=$(echo "$TOOL_ARGS" | jq -r 'to_entries|map("\(.key): \(.value)")|.[]' | paste -sd ', ')
-		print_info "running tool \"$TOOL_NAME\" $TOOL_ARGS_READABLE"
+		TOOL_REASON=$(echo "$TOOL_ARGS" | jq -r '.tool_reason')
+		TOOL_ARGS_READABLE=$(echo "$TOOL_ARGS" | jq -r 'del(.tool_reason)|to_entries|map("\(.key): \(.value)")|.[]' | paste -sd ',' - | awk '{gsub(/,/, ", "); print}')
+		print_info "$TOOL_REASON"
+		print_info "Using tool \"$TOOL_NAME\" $TOOL_ARGS_READABLE"
 		
 		echo "$TOOL_NAME" >> /tmp/bai_tool_output.txt
 		echo "$TOOL_ARGS_READABLE" >> /tmp/bai_tool_output.txt
@@ -595,6 +628,8 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ] || [ "$AWAIT_
 		if [ "$EXPOSE_CURRENT_DIR" = true ]; then
 			sys_msg+="User is working from directory \\\"$(json_safe "$(pwd)")\\\"."
 		fi
+		# Apply date
+		sys_msg+=" The current date is Y-m-d H:M \\\"$(date "+%Y-%m-%d %H:%M")\\\"."
 		# Apply dynamic system query
 		sys_msg+="$DYNAMIC_SYSTEM_QUERY"
 		# Apply the system message to history
@@ -680,157 +715,137 @@ while [ "$INTERACTIVE_MODE" = true ] || [ "$NEEDS_TO_RUN" = true ] || [ "$AWAIT_
 	fi
 	
 	# Extract the reply from the JSON response
-	REPLY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+	REPLY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // ""')
 	
-	# Process the reply
+	# Was there an error?
+	if [ ${#REPLY} -le 1 ]; then
+		REPLY=$(echo "$RESPONSE" | jq -r '.error.message // "An unknown error occurred."')
+	fi
+	
 	echo -ne "$CLEAR_LINE\r"
-	if [ -z "$REPLY" ]; then
-		# We didn't get a reply
-		print_info "$NO_REPLY_TEXT"
-		echo -ne "$SHOW_CURSOR"
-	else
-		
-		# Check the reason for stopping
-		FINISH_REASON=$(echo "$RESPONSE" | jq -r '.choices[0].finish_reason')
-		
-		if [ "$FINISH_REASON" = "stop" ]; then
-			# We got a proper reply
-			# Apply it to message history
-			HISTORY_MESSAGES+=',{
-				"role": "assistant",
-				"content": "'"$(json_safe "$REPLY")"'"
-			}'
-		else
-			if [ "$FINISH_REASON" == "length" ]; then
+	
+	# Check if there was a reason for stopping
+	FINISH_REASON=$(echo "$RESPONSE" | jq -r '.choices[0].finish_reason // ""')
+	
+	# If the reason IS NOT stop
+	if [ "$FINISH_REASON" != "stop" ]; then
+		if [ "$FINISH_REASON" == "length" ]; then
 			
-				# Check if the last character is a closing brace
-				if [[ "${REPLY: -1}" != "}" ]]; then
-					REPLY+="\"}"
-				fi
-
-				# Check if the number of opening and closing braces match
-				while [[ $(tr -cd '{' <<< "$REPLY" | wc -c) -gt $(tr -cd '}' <<< "$REPLY" | wc -c) ]]; do
-					REPLY+="}"
-				done
-
-				# Check if the number of double quotes is even
-				if (( $(tr -cd '"' <<< "$REPLY" | wc -c) % 2 != 0 )); then
-					REPLY+="\\\""
-				fi
-
-				# Replace any unescaped single backslashes with double backslashes
-				REPLY="${REPLY//\\\\/\\\\\\\\}"
-			elif [ "$FINISH_REASON" == "content_filter" ]; then
-				REPLY="Your query was rejected."
-			elif [ "$FINISH_REASON" == "tool_calls" ]; then
-				# One or multiple tools were called for
-				#REPLY="running command "
-				TOOL_CALLS_COUNT=$(echo "$RESPONSE" | jq '.choices[0].message.tool_calls | length')
-				
-				for ((i=0; i<$TOOL_CALLS_COUNT; i++)); do
-					TOOL_ID=$(echo "$RESPONSE" | jq -r '.choices[0].message.tool_calls['"$i"'].id')
-					TOOL_NAME=$(echo "$RESPONSE" | jq -r '.choices[0].message.tool_calls['"$i"'].function.name')
-					TOOL_ARGS=$(echo "$RESPONSE" | jq -r '.choices[0].message.tool_calls['"$i"'].function.arguments')
-					
-					#if [ $i -ne 0 ]; then
-					#	REPLY+="and "
-					#fi
-					
-					# Append name
-					#REPLY+="\"$TOOL_NAME\" "
-					
-					# Append args and strip the leading `{ `and ending ` }`
-					#REPLY+="with args ${TOOL_ARGS:2:-2}"
-					
-					# Get return from run_tool and apply to our history
-					HISTORY_MESSAGES+=',{
-						"role": "assistant",
-						"content": null,
-						"tool_calls": [
-							{
-								"id": "'"$TOOL_ID"'",
-								"type": "function",
-								"function": {
-									"name": "'"$TOOL_NAME"'",
-									"arguments": "'"$(json_safe "$TOOL_ARGS")"'"
-								}
-							}
-						]
-					}'
-					
-					run_tool "$TOOL_ID" "$TOOL_NAME" "$TOOL_ARGS"
-					#REPLY+=" - returned with $TOOL_OUTPUT"
-				done
-				#REPLY+="..."
-				
-				REPLY=""
-				
-				# Reapply system message
-				#HISTORY_MESSAGES+="$LAST_HISTORY_MESSAGE"
-			else
-				# Try to get the message from error > message
-				ERR_MSG=$(echo "$RESPONSE" | jq -r '.error.message')
-				if [ "$ERR_MSG" != "null" ]; then
-					REPLY=" $ERR_MSG"
-				else
-					REPLY="An unknown error occured."
-					print_info "$RESPONSE"
-				fi
+			# Check if the last character is a closing brace
+			if [[ "${REPLY: -1}" != "}" ]]; then
+				REPLY+="\"}"
 			fi
+			
+			# Check if the number of opening and closing braces match
+			while [[ $(tr -cd '{' <<< "$REPLY" | wc -c) -gt $(tr -cd '}' <<< "$REPLY" | wc -c) ]]; do
+				REPLY+="}"
+			done
+			
+			# Check if the number of double quotes is even
+			if (( $(tr -cd '"' <<< "$REPLY" | wc -c) % 2 != 0 )); then
+				REPLY+="\\\""
+			fi
+			
+			# Replace any unescaped single backslashes with double backslashes
+			REPLY="${REPLY//\\\\/\\\\\\\\}"
+		elif [ "$FINISH_REASON" == "content_filter" ]; then
+			REPLY="Your query was rejected."
+		elif [ "$FINISH_REASON" == "tool_calls" ]; then
+			# One or multiple tools were called for
+			TOOL_CALLS_COUNT=$(echo "$RESPONSE" | jq '.choices[0].message.tool_calls | length')
+			
+			for ((i=0; i<$TOOL_CALLS_COUNT; i++)); do
+				TOOL_ID=$(echo "$RESPONSE" | jq -r '.choices[0].message.tool_calls['"$i"'].id')
+				TOOL_NAME=$(echo "$RESPONSE" | jq -r '.choices[0].message.tool_calls['"$i"'].function.name')
+				TOOL_ARGS=$(echo "$RESPONSE" | jq -r '.choices[0].message.tool_calls['"$i"'].function.arguments')
+				
+				# Get return from run_tool and apply to our history
+				HISTORY_MESSAGES+=',{
+					"role": "assistant",
+					"content": null,
+					"tool_calls": [
+						{
+							"id": "'"$TOOL_ID"'",
+							"type": "function",
+							"function": {
+								"name": "'"$TOOL_NAME"'",
+								"arguments": "'"$(json_safe "$TOOL_ARGS")"'"
+							}
+						}
+					]
+				}'
+				
+				run_tool "$TOOL_ID" "$TOOL_NAME" "$TOOL_ARGS"
+			done
+			REPLY=""
+		fi
+	fi
+	
+	# If we still have a reply
+	if [ ${#REPLY} -gt 1 ]; then
+		# Try to assemble a JSON object from the REPLY
+		JSON_CONTENT=$(echo "$REPLY" | perl -0777 -pe 's/.*?(\{.*?\})(\n| ).*/$1/s')
+		JSON_CONTENT=$(echo "$JSON_CONTENT" | jq -r . 2>/dev/null)
+		
+		# Was there JSON content?
+		if [ ${#JSON_CONTENT} -le 1 ]; then
+			# No JSON content, use the REPLY as is
+			JSON_CONTENT="{\"info\": \"$REPLY\"}"
 		fi
 		
-		if [[ "$REPLY" == *$'}\n{'* ]]; then
-			REPLY=$(echo "$REPLY" | jq -s '.[0]')
-		fi
+		# Apply the message to history
+		HISTORY_MESSAGES+=',{
+			"role": "assistant",
+			"content": "'"$(json_safe "$JSON_CONTENT")"'"
+		}'
 		
-		# If REPLY is longer than 1
-		if [ ${#REPLY} -gt 1 ]; then
-			# Extract information from the first JSON object
-			INFO=$(echo "$REPLY" | awk -F"\n" '{print $1}' | jq -e -r '.info' 2>/dev/null)
-
-			# Extract command from the first JSON object
-			CMD=$(echo "$REPLY" | awk -F"\n" '{print $1}' | jq -e -r '.cmd' 2>/dev/null)
-			if [ $? -ne 0 ] || [ -z "$CMD" ]; then
-				# Not a command
-				if [ -z "$INFO" ]; then
-					# No info
-					print_info "$REPLY"
-				else
-					# Print info
-					print_info "$INFO"
-				fi
-				echo -ne "$SHOW_CURSOR"
+		# Extract cmd
+		CMD=$(echo "$JSON_CONTENT" | jq -r '.cmd // ""' 2>/dev/null)
+		
+		# Extract info
+		INFO=$(echo "$JSON_CONTENT" | jq -r '.info // ""' 2>/dev/null)
+		
+		# Check if CMD is empty
+		if [ ${#CMD} -le 0 ]; then
+			# Not a command
+			if [ ${#INFO} -le 0 ]; then
+				# No info
+				print_info "$REPLY"
 			else
-				# Make sure some sort of information exists
-				if [ -z "$INFO" ]; then
-					INFO="warning: no information"
-				fi
-				
-				# Print command and information
-				print_cmd "$CMD"
+				# Print info
 				print_info "$INFO"
-				
-				# Ask for user command confirmation
-				echo -n "${PRE_TEXT}execute command? [y/e/N]: "
-				echo -ne "$SHOW_CURSOR"
-				read -n 1 -r -s answer
-				
-				# Did the user want to edit the command?
-				if [ "$answer" == "Y" ] || [ "$answer" == "y" ]; then
-					# RUN
-					echo "yes";echo
-					run_cmd "$CMD"
-				elif [ "$answer" == "E" ] || [ "$answer" == "e" ]; then
-					# EDIT
-					echo -ne "$CLEAR_LINE\r"
-					read -e -r -p "${PRE_TEXT}edit command: " -i "$CMD" CMD
-					echo
-					run_cmd "$CMD"
-				else
-					# CANCEL
-					echo "no";echo
-					print_cancel "[cancel]"
-				fi
+			fi
+			echo -ne "$SHOW_CURSOR"
+		else
+			# Make sure we have some info
+			if [ ${#INFO} -le 0 ]; then
+				INFO="warning: no information"
+			fi
+			
+			# Print command and information
+			print_cmd "$CMD"
+			print_info "$INFO"
+			
+			# Ask for user command confirmation
+			echo -n "${PRE_TEXT}execute command? [y/e/N]: "
+			echo -ne "$SHOW_CURSOR"
+			read -n 1 -r -s answer
+			
+			# Did the user want to edit the command?
+			if [ "$answer" == "Y" ] || [ "$answer" == "y" ]; then
+				# RUN
+				echo "yes";echo
+				run_cmd "$CMD"
+			elif [ "$answer" == "E" ] || [ "$answer" == "e" ]; then
+				# EDIT
+				echo -ne "$CLEAR_LINE\r"
+				read -e -r -p "${PRE_TEXT}edit command: " -i "$CMD" CMD
+				echo
+				run_cmd "$CMD"
+			else
+				# CANCEL
+				echo "no";echo
+				print_cancel "[cancel]"
 			fi
 		fi
 	fi
