@@ -182,7 +182,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
 		echo "model=gpt-3.5-turbo"
 		echo "json_mode=false"
 		echo "temp=0.1"
-		echo "tokens=100"
+		echo "tokens=500"
 		echo "exec_query="
 		echo "question_query="
 		echo "error_query="

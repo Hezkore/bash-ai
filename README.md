@@ -103,7 +103,7 @@ curl -sS https://raw.githubusercontent.com/hezkore/bash-ai/main/install.sh | bas
 
 ## Configuration
 
-On the first run, a configuration file named `bai.cfg` will be created in your `~/.config` directory.\
+On the first run, a configuration file named `bai.cfg` will be created in your `~/.config` directory.
 
 > [!IMPORTANT]
 > Always remove `bai.cfg` before updating Bash AI to avoid compatibility issues.
