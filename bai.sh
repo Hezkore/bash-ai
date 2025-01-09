@@ -179,7 +179,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
 		echo "expose_current_dir=true"
 		echo "max_history=10"
 		echo "api=https://api.openai.com/v1/chat/completions"
-		echo "model=gpt-3.5-turbo"
+		echo "model=gpt-4o-mini"
 		echo "json_mode=false"
 		echo "temp=0.1"
 		echo "tokens=500"
